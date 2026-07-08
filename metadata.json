@@ -1,0 +1,6 @@
+{
+  "name": "Football Manager Squad Planner",
+  "description": "Organiza y planifica tu plantel de Football Manager (hasta 110+ jugadores) en titulares, suplentes y juveniles por posición, gestionando préstamos, ventas e importación de IDs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,291 @@
+import React, { useState } from 'react';
+import { Player } from '../types';
+import { Upload, HelpCircle, CheckCircle, AlertCircle, Sparkles } from 'lucide-react';
+
+interface ClipboardImporterProps {
+  onImportPlayers: (newPlayers: Player[], mode: 'replace' | 'append') => void;
+  currentPlayersCount: number;
+}
+
+export function ClipboardImporter({ onImportPlayers, currentPlayersCount }: ClipboardImporterProps) {
+  const [pasteData, setPasteData] = useState('');
+  const [importMode, setImportMode] = useState<'replace' | 'append'>('append');
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleParseAndImport = () => {
+    const text = pasteData.trim();
+    if (!text) {
+      setStatusMessage({ type: 'error', text: 'Por favor, pega datos válidos en el cuadro de texto.' });
+      return;
+    }
+
+    try {
+      const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+      if (lines.length === 0) {
+        setStatusMessage({ type: 'error', text: 'No se encontraron líneas de texto válidas.' });
+        return;
+      }
+
+      const delimiter = "\t"; // Football Manager clipboard is Tab-Separated Values (TSV)
+      const parsedPlayers: Player[] = [];
+      let nextIdSeed = Date.now();
+
+      // Check if first line contains column headers
+      const headerLine = lines[0];
+      const cellsInHeader = headerLine.split(delimiter).map(c => c.toLowerCase().trim());
+      
+      const hasHeaders = cellsInHeader.some(cell => 
+        cell.includes("id") || cell.includes("nombre") || cell.includes("name") || 
+        cell.includes("pos") || cell.includes("edad") || cell.includes("age") || 
+        cell.includes("valor") || cell.includes("value") || cell.includes("sueldo") || cell.includes("wage")
+      );
+
+      const startIndex = hasHeaders ? 1 : 0;
+      const headers = hasHeaders ? cellsInHeader : [];
+
+      for (let i = startIndex; i < lines.length; i++) {
+        const cells = lines[i].split(delimiter).map(c => c.trim());
+        if (cells.length < 2) continue; // Skip lines with insufficient columns
+
+        let id = "";
+        let name = "";
+        let age = 22;
+        let position = "M (C)";
+        let nationality = "Desconocida";
+        let currentAbility = 2;
+        let potentialAbility = 3;
+        let marketValue = "";
+        let wage = "";
+
+        if (hasHeaders) {
+          headers.forEach((header, colIndex) => {
+            const val = cells[colIndex];
+            if (!val) return;
+
+            if (header.includes("id") || header === "pk") {
+              id = val;
+            } else if (header.includes("nombre") || header.includes("name") || header === "nom") {
+              name = val;
+            } else if (header.includes("edad") || header.includes("age") || header === "eda") {
+              const parsedAge = parseInt(val);
+              if (!isNaN(parsedAge)) age = parsedAge;
+            } else if (header.includes("pos") || header === "puesto") {
+              position = val;
+            } else if (header.includes("nacionalidad") || header.includes("nac") || header.includes("nat")) {
+              nationality = val;
+            } else if (header.includes("valor") || header.includes("value") || header === "val") {
+              marketValue = val;
+            } else if (header.includes("sueldo") || header.includes("wage") || header.includes("sal") || header.includes("contrato")) {
+              wage = val;
+            } else if (header.includes("ca") || header.includes("calidad actual") || header.includes("ability") || header.includes("cur")) {
+              // Convert stars or scale
+              if (val.includes("*")) {
+                currentAbility = val.split('*').length - 1;
+              } else {
+                const num = parseInt(val);
+                if (!isNaN(num)) currentAbility = num > 5 ? Math.round((num / 200) * 5) : num;
+              }
+            } else if (header.includes("pa") || header.includes("potencial") || header.includes("potential") || header.includes("pot")) {
+              if (val.includes("*")) {
+                potentialAbility = val.split('*').length - 1;
+              } else {
+                const num = parseInt(val);
+                if (!isNaN(num)) potentialAbility = num > 5 ? Math.round((num / 200) * 5) : num;
+              }
+            }
+          });
+        } else {
+          // INTELLIGENT HEURISTIC GUESSING IF NO HEADERS
+          cells.forEach((val, colIdx) => {
+            if (!val) return;
+
+            // 1. Check for FM Unique ID (Usually 8-10 digit numbers)
+            if (/^\d{6,11}$/.test(val)) {
+              id = val;
+            }
+            // 2. Check for Age (Usually 14 to 45)
+            else if (/^\d{2}$/.test(val) && colIdx !== 0) {
+              const parsedAge = parseInt(val);
+              if (parsedAge >= 14 && parsedAge <= 45) {
+                age = parsedAge;
+              }
+            }
+            // 3. Check for currency values (Value or Wage)
+            else if (/[€$£M|K|d]/.test(val)) {
+              if (val.toLowerCase().includes("sem") || val.toLowerCase().includes("w") || val.toLowerCase().includes("/s") || val.toLowerCase().includes("semana")) {
+                wage = val;
+              } else {
+                marketValue = val;
+              }
+            }
+            // 4. Check for standard positions keywords
+            else if (/^(GK|POR|DFC|DFC\s*[DIL]|DF\s*[DIL]|LD|LI|CR|MCD|MC|MP|ENG|EXT|DL|ST|AM[LRC]|D[LRC]|M[LRC]|DM|W[BLR])/i.test(val)) {
+              position = val;
+            }
+            // 5. If it looks like a full name (letters, spaces, length > 4) and we don't have one yet
+            else if (val.includes(" ") && val.length > 3 && !name) {
+              name = val;
+            }
+            // 6. Stars or scale (1 to 5)
+            else if (/^[1-5]$/.test(val)) {
+              if (currentAbility === 2) currentAbility = parseInt(val);
+              else if (potentialAbility === 3) potentialAbility = parseInt(val);
+            }
+          });
+
+          // Fallback name guessing if none detected
+          if (!name) {
+            // First text-heavy cell
+            const textCells = cells.filter(c => !/^\d+$/.test(c) && c.length > 2);
+            name = textCells[0] || `Jugador Importado #${i}`;
+          }
+        }
+
+        // Clean up and default-values for parsed cells
+        id = id || String(nextIdSeed++);
+        marketValue = marketValue || "€2M";
+        wage = wage || "€10K/sem";
+
+        parsedPlayers.push({
+          id,
+          name,
+          age,
+          position: cleanFmPosition(position),
+          nationality,
+          currentAbility: Math.max(1, Math.min(5, currentAbility)),
+          potentialAbility: Math.max(1, Math.min(5, potentialAbility)),
+          marketValue,
+          wage,
+          squadStatus: "no_asignado",
+          notes: "Importado desde planilla Football Manager"
+        });
+      }
+
+      if (parsedPlayers.length === 0) {
+        setStatusMessage({ type: 'error', text: 'No se pudo identificar ningún jugador válido en el texto pegado.' });
+        return;
+      }
+
+      onImportPlayers(parsedPlayers, importMode);
+      setPasteData('');
+      setStatusMessage({
+        type: 'success',
+        text: `¡Éxito! Se han importado correctamente ${parsedPlayers.length} jugadores en tu plantel.`
+      });
+
+    } catch (err: any) {
+      console.error(err);
+      setStatusMessage({ type: 'error', text: `Ocurrió un error al procesar el archivo: ${err.message}` });
+    }
+  };
+
+  // Helper to map complex FM positions to our compact pitch positions
+  const cleanFmPosition = (pos: string): string => {
+    const upper = pos.toUpperCase();
+    if (upper.includes("GK") || upper.includes("POR")) return "GK";
+    if (upper.includes("D (C)") || upper.includes("DFC")) return "D (C)";
+    if (upper.includes("D (L)") || upper.includes("DF I") || upper.includes("LI") || upper.includes("DFL")) return "D (L)";
+    if (upper.includes("D (R)") || upper.includes("DF D") || upper.includes("LD") || upper.includes("DFR")) return "D (R)";
+    if (upper.includes("DM") || upper.includes("MCD")) return "DM";
+    if (upper.includes("M (C)") || upper.includes("MC")) return "M (C)";
+    if (upper.includes("AM (L)") || upper.includes("MP I") || upper.includes("AML") || upper.includes("EXT I")) return "AM (L)";
+    if (upper.includes("AM (R)") || upper.includes("MP D") || upper.includes("AMR") || upper.includes("EXT D")) return "AM (R)";
+    if (upper.includes("AM (C)") || upper.includes("ENG") || upper.includes("AMC") || upper.includes("MP C")) return "AM (C)";
+    if (upper.includes("ST") || upper.includes("DL") || upper.includes("STC") || upper.includes("ST (C)")) return "ST (C)";
+    return pos; // Fallback
+  };
+
+  return (
+    <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-5">
+      
+      {/* Title */}
+      <div>
+        <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          📥 Importador de Jugadores (Desde Football Manager)
+        </h2>
+        <p className="text-xs text-slate-400">
+          No cargues tus jugadores uno por uno. Nuestro importador lee los datos directamente del portapapeles de FM de forma masiva.
+        </p>
+      </div>
+
+      {/* Guide Banner */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 text-xs">
+        <h3 className="font-bold text-emerald-400 flex items-center gap-1">
+          <HelpCircle className="w-4 h-4" /> ¿Cómo extraer tu plantel de Football Manager e importarlo aquí?
+        </h3>
+        <ol className="list-decimal pl-5 space-y-1.5 text-slate-300">
+          <li>Abre tu partida en **Football Manager**.</li>
+          <li>Ve a la sección **Plantilla (Squad)** en el menú lateral izquierdo.</li>
+          <li>Asegúrate de que tu vista de plantilla tenga al menos las columnas clave (**ID único**, **Nombre**, **Edad**, **Posición**, **Valor de mercado**, **Sueldo**).</li>
+          <li>Haz clic sobre cualquier fila del plantel y pulsa **Ctrl + A** (para seleccionar todo tu plantel) o usa Shift + Click.</li>
+          <li>Pulsa **Ctrl + C** (Copiar) en tu teclado. Esto copiará automáticamente toda la tabla como datos tabulados (TSV).</li>
+          <li>Regresa aquí, selecciona tu modo de importación abajo y **pega (Ctrl + V)** el texto en el área grande.</li>
+        </ol>
+        <p className="text-[10px] text-slate-500 font-mono italic">
+          *Nota: El extractor es inteligente. No importa en qué orden estén las columnas o si traduces el juego, adivinará la información de tus jugadores.
+        </p>
+      </div>
+
+      {/* Paste Zone */}
+      <div className="space-y-2">
+        <label className="text-xs uppercase font-mono font-bold text-slate-400">Pega tu portapapeles aquí:</label>
+        <textarea
+          rows={7}
+          value={pasteData}
+          onChange={(e) => setPasteData(e.target.value)}
+          placeholder={`ID\tNombre\tEdad\tPosición\tValor\tSueldo\n1001\tMarc-André Ter Steger\t31\tGK\t€35M\t€150K/sem\n2001\tRonaldo Araújo\t25\tD (C)\t€75M\t€180K/sem`}
+          className="w-full bg-slate-900 border border-slate-800 text-xs font-mono p-3 rounded-lg text-slate-300 placeholder-slate-600 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20"
+        />
+      </div>
+
+      {/* Actions and Mode Selector */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900/50 p-3 rounded-xl border border-slate-850">
+        
+        {/* Mode choice */}
+        <div className="flex items-center gap-3 text-xs">
+          <span className="font-bold text-slate-300">Modo de Importación:</span>
+          <label className="flex items-center gap-1.5 cursor-pointer text-slate-300">
+            <input
+              type="radio"
+              name="importMode"
+              checked={importMode === 'append'}
+              onChange={() => setImportMode('append')}
+              className="text-emerald-500 focus:ring-emerald-500 bg-slate-950 border-slate-800"
+            />
+            <span>Añadir al plantel actual ({currentPlayersCount} actuales)</span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer text-slate-300">
+            <input
+              type="radio"
+              name="importMode"
+              checked={importMode === 'replace'}
+              onChange={() => setImportMode('replace')}
+              className="text-emerald-500 focus:ring-emerald-500 bg-slate-950 border-slate-800"
+            />
+            <span className="text-rose-400 font-medium">Reemplazar plantilla existente</span>
+          </label>
+        </div>
+
+        {/* Action Button */}
+        <button
+          onClick={handleParseAndImport}
+          className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-5 py-2.5 rounded-lg flex items-center justify-center gap-1.5 font-bold transition shadow-md shadow-emerald-950/20"
+        >
+          <Upload className="w-4 h-4" /> Importar de Inmediato
+        </button>
+      </div>
+
+      {/* Feedback messages */}
+      {statusMessage && (
+        <div className={`p-3 rounded-lg text-xs flex items-center gap-2 border ${
+          statusMessage.type === 'success' 
+            ? 'bg-emerald-950/30 text-emerald-400 border-emerald-500/20' 
+            : 'bg-rose-950/30 text-rose-400 border-rose-500/20'
+        }`}>
+          {statusMessage.type === 'success' ? <CheckCircle className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+          <span>{statusMessage.text}</span>
+        </div>
+      )}
+    </div>
+  );
+}
