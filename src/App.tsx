@@ -4,7 +4,6 @@ import { defaultPlayers, defaultFormations } from './defaultPlayers';
 import { PitchView } from './components/PitchView';
 import { RosterManager } from './components/RosterManager';
 import { ClipboardImporter } from './components/ClipboardImporter';
-import { AICoach } from './components/AICoach';
 import { ProgressionTracker } from './components/ProgressionTracker';
 import { 
   Users, 
@@ -47,7 +46,7 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [activeTab, setActiveTab] = useState<'squad_pitch' | 'players_list' | 'clipboard_import' | 'ai_advisor' | 'stats' | 'progression_tracker'>('squad_pitch');
+  const [activeTab, setActiveTab] = useState<'squad_pitch' | 'players_list' | 'clipboard_import' | 'stats' | 'progression_tracker'>('squad_pitch');
   const [selectedPosition, setSelectedPosition] = useState<PitchPosition | null>(null);
   const [candidateSearch, setCandidateSearch] = useState('');
   const [showAllCandidates, setShowAllCandidates] = useState(false);
@@ -448,17 +447,6 @@ export default function App() {
               📥 Importar de FM (Clipboard)
             </button>
             <button
-              onClick={() => setActiveTab('ai_advisor')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-sans transition flex items-center gap-1.5 whitespace-nowrap
-                ${activeTab === 'ai_advisor' 
-                  ? 'bg-slate-800 text-emerald-400 shadow-inner' 
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-                }
-              `}
-            >
-              🧠 Asesor Táctico IA
-            </button>
-            <button
               onClick={() => setActiveTab('stats')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold font-sans transition flex items-center gap-1.5 whitespace-nowrap
                 ${activeTab === 'stats' 
@@ -803,15 +791,6 @@ export default function App() {
           <ClipboardImporter
             onImportPlayers={handleImportPlayers}
             currentPlayersCount={players.length}
-          />
-        )}
-
-        {/* TAB 4: AI COACH TACTICAL ADVISOR */}
-        {activeTab === 'ai_advisor' && (
-          <AICoach
-            players={players}
-            activeFormation={activeFormation}
-            assignments={assignments}
           />
         )}
 
