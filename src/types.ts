@@ -8,7 +8,8 @@ export interface Player {
   potentialAbility: number; // 1 to 5 stars
   marketValue: string; // e.g., "€12M"
   wage: string; // e.g., "€45K/semana"
-  squadStatus: 'titular' | 'suplente' | 'juvenil' | 'cedido' | 'vender' | 'no_asignado';
+  squadStatus: 'titular' | 'suplente' | 'juvenil' | 'recambio' | 'cesion' | 'venta' | 'desarrollo' | 'descartes' | 'no_asignado';
+  assignedPosition?: string; // Column mapped on the tactical matrix grid (e.g. "GK", "DFCD", etc.)
   notes?: string;
 }
 

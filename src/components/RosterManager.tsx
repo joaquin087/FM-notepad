@@ -37,8 +37,11 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
     'titular': '🟢 Titular',
     'suplente': '🟡 Suplente',
     'juvenil': '🔵 Juvenil',
-    'cedido': '✈️ Préstamo',
-    'vender': '💰 Venta',
+    'recambio': '🔄 Recambio',
+    'cesion': '✈️ Cesión',
+    'venta': '💰 Venta',
+    'desarrollo': '🌱 Desarrollo',
+    'descartes': '❌ Descarte',
     'no_asignado': '⚪ Sin Asignar'
   };
 
@@ -495,8 +498,11 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                       ${player.squadStatus === 'titular' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : ''}
                       ${player.squadStatus === 'suplente' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : ''}
                       ${player.squadStatus === 'juvenil' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : ''}
-                      ${player.squadStatus === 'cedido' ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' : ''}
-                      ${player.squadStatus === 'vender' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : ''}
+                      ${player.squadStatus === 'recambio' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : ''}
+                      ${player.squadStatus === 'cesion' ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' : ''}
+                      ${player.squadStatus === 'venta' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : ''}
+                      ${player.squadStatus === 'desarrollo' ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' : ''}
+                      ${player.squadStatus === 'descartes' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : ''}
                       ${player.squadStatus === 'no_asignado' ? 'bg-slate-800/50 text-slate-400 border border-slate-700/30' : ''}
                     `}>
                       {statusLabels[player.squadStatus]}
@@ -515,12 +521,15 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                         }}
                         className="bg-slate-900 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-300 font-sans focus:outline-none focus:border-slate-700 cursor-pointer"
                       >
-                        <option value="no_asignado">Reserva</option>
-                        <option value="cedido">✈️ Préstamo</option>
-                        <option value="vender">💰 Vender</option>
-                        <option value="titular" disabled>Titular (pizarra)</option>
-                        <option value="suplente" disabled>Suplente (pizarra)</option>
-                        <option value="juvenil" disabled>Juvenil (pizarra)</option>
+                        <option value="no_asignado">⚪ Sin Asignar</option>
+                        <option value="titular">🟢 Titular</option>
+                        <option value="suplente">🟡 Suplente</option>
+                        <option value="juvenil">🔵 Juvenil</option>
+                        <option value="recambio">🔄 Recambio</option>
+                        <option value="cesion">✈️ Cesión</option>
+                        <option value="venta">💰 Venta</option>
+                        <option value="desarrollo">🌱 Desarrollo</option>
+                        <option value="descartes">❌ Descarte</option>
                       </select>
 
                       <button

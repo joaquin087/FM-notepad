@@ -5,6 +5,7 @@ import { PitchView } from './components/PitchView';
 import { RosterManager } from './components/RosterManager';
 import { ClipboardImporter } from './components/ClipboardImporter';
 import { ProgressionTracker } from './components/ProgressionTracker';
+import { PlanningGrid, getAutoColumn } from './components/PlanningGrid';
 import { 
   Users, 
   Settings, 
@@ -46,7 +47,7 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [activeTab, setActiveTab] = useState<'squad_pitch' | 'players_list' | 'clipboard_import' | 'stats' | 'progression_tracker'>('squad_pitch');
+  const [activeTab, setActiveTab] = useState<'squad_pitch' | 'players_list' | 'clipboard_import' | 'stats' | 'progression_tracker' | 'planning_grid'>('planning_grid');
   const [selectedPosition, setSelectedPosition] = useState<PitchPosition | null>(null);
   const [candidateSearch, setCandidateSearch] = useState('');
   const [showAllCandidates, setShowAllCandidates] = useState(false);
@@ -202,17 +203,56 @@ export default function App() {
 
   // Callback: Clipboard paste massive import
   const handleImportPlayers = (newPlayers: Player[], mode: 'replace' | 'append') => {
-    if (mode === 'replace') {
-      setPlayers(newPlayers);
-      setAssignments({}); // Reset tactical board
-    } else {
-      // Append: avoid exact ID duplicates
-      setPlayers(prev => {
-        const existingIds = new Set(prev.map(p => p.id));
-        const filteredNew = newPlayers.filter(p => !existingIds.has(p.id));
-        return [...filteredNew, ...prev];
+    setPlayers(prev => {
+      const prevMap = new Map<string, Player>();
+      prev.forEach(p => prevMap.set(p.id, p));
+
+      const processedNew = newPlayers.map(p => {
+        const existing = prevMap.get(p.id);
+        if (existing) {
+          // Merge: keep status, assigned matrix position, and notes, but update stats (age, value, wage, ratings, nationality)
+          let mergedStatus = existing.squadStatus;
+          if (mergedStatus === 'no_asignado' && p.squadStatus !== 'no_asignado') {
+            mergedStatus = p.squadStatus;
+          } else if (mergedStatus as string === 'cedido') {
+            mergedStatus = 'cesion';
+          } else if (mergedStatus as string === 'vender') {
+            mergedStatus = 'venta';
+          }
+          return {
+            ...p,
+            squadStatus: mergedStatus,
+            assignedPosition: existing.assignedPosition || p.assignedPosition || getAutoColumn(p.position),
+            notes: existing.notes || p.notes
+          };
+        } else {
+          // New player: auto-detect tactical column and map status
+          let status = p.squadStatus;
+          if (status === 'no_asignado') {
+            status = 'recambio';
+          } else if (status as string === 'cedido') {
+            status = 'cesion';
+          } else if (status as string === 'vender') {
+            status = 'venta';
+          }
+          const autoCol = p.assignedPosition || getAutoColumn(p.position);
+          return {
+            ...p,
+            assignedPosition: autoCol,
+            squadStatus: status,
+            notes: p.notes || "Nuevo jugador importado"
+          };
+        }
       });
-    }
+
+      if (mode === 'replace') {
+        return processedNew;
+      } else {
+        const existingIds = new Set(prev.map(x => x.id));
+        const filteredNew = processedNew.filter(x => !existingIds.has(x.id));
+        return [...filteredNew, ...prev];
+      }
+    });
   };
 
   // Reset entirely to standard default 110 database
@@ -323,9 +363,9 @@ export default function App() {
 
   // Calculate high level stats for display
   const totalPlayers = players.length;
-  const planGksCount = players.filter(p => p.squadStatus === 'titular' || p.squadStatus === 'suplente' || p.squadStatus === 'juvenil').length;
-  const loanListCount = players.filter(p => p.squadStatus === 'cedido').length;
-  const sellListCount = players.filter(p => p.squadStatus === 'vender').length;
+  const planGksCount = players.filter(p => p.squadStatus && p.squadStatus !== 'no_asignado').length;
+  const loanListCount = players.filter(p => p.squadStatus === 'cesion').length;
+  const sellListCount = players.filter(p => p.squadStatus === 'venta').length;
   const unassignedCount = players.filter(p => p.squadStatus === 'no_asignado').length;
 
   const averageAge = totalPlayers > 0 
@@ -414,6 +454,17 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 flex justify-between items-center overflow-x-auto">
           <div className="flex space-x-1 py-1.5 scrollbar-none">
             <button
+              onClick={() => setActiveTab('planning_grid')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-sans transition flex items-center gap-1.5 whitespace-nowrap
+                ${activeTab === 'planning_grid' 
+                  ? 'bg-slate-800 text-emerald-400 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }
+              `}
+            >
+              🧮 Matriz de Planeamiento
+            </button>
+            <button
               onClick={() => setActiveTab('squad_pitch')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold font-sans transition flex items-center gap-1.5 whitespace-nowrap
                 ${activeTab === 'squad_pitch' 
@@ -498,6 +549,17 @@ export default function App() {
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-4 py-5 font-sans">
         
+        {/* TAB 0: DETAILED PLANNING GRID MATRIX */}
+        {activeTab === 'planning_grid' && (
+          <PlanningGrid
+            players={players}
+            onUpdatePlayer={handleUpdatePlayer}
+            onUpdatePlayersBatch={(updatedBatch) => {
+              setPlayers(updatedBatch);
+            }}
+          />
+        )}
+
         {/* TAB 1: SQUAD PLANNER WITH THE INTERACTIVE PITCH */}
         {activeTab === 'squad_pitch' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
@@ -867,10 +929,10 @@ export default function App() {
                     ✈️ Lista de Préstamos Activa ({loanListCount})
                   </h3>
                   <div className="max-h-[140px] overflow-y-auto space-y-1 pr-1 text-[11px] font-sans">
-                    {players.filter(p => p.squadStatus === 'cedido').length === 0 ? (
+                    {players.filter(p => p.squadStatus === 'cesion').length === 0 ? (
                       <div className="text-slate-500 italic py-2">Ningún jugador marcado para préstamo.</div>
                     ) : (
-                      players.filter(p => p.squadStatus === 'cedido').map(p => (
+                      players.filter(p => p.squadStatus === 'cesion').map(p => (
                         <div key={p.id} className="flex justify-between items-center bg-slate-950 p-1.5 rounded border border-slate-850">
                           <span className="text-slate-200 font-medium">{p.name} ({p.position})</span>
                           <span className="text-amber-400 font-mono">★ {p.potentialAbility} pot</span>
@@ -886,10 +948,10 @@ export default function App() {
                     💰 Lista de Transferibles Activa ({sellListCount})
                   </h3>
                   <div className="max-h-[140px] overflow-y-auto space-y-1 pr-1 text-[11px] font-sans">
-                    {players.filter(p => p.squadStatus === 'vender').length === 0 ? (
+                    {players.filter(p => p.squadStatus === 'venta').length === 0 ? (
                       <div className="text-slate-500 italic py-2">Ningún jugador marcado para transferir.</div>
                     ) : (
-                      players.filter(p => p.squadStatus === 'vender').map(p => (
+                      players.filter(p => p.squadStatus === 'venta').map(p => (
                         <div key={p.id} className="flex justify-between items-center bg-slate-950 p-1.5 rounded border border-slate-850">
                           <span className="text-slate-200 font-medium">{p.name} ({p.position})</span>
                           <span className="text-slate-400 font-mono font-medium">{p.marketValue}</span>

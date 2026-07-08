@@ -1,7 +1,7 @@
 import { Player, Formation } from "./types";
 
 // Helper to generate a realistic large list of 110 players for a top/mid-tier club
-const rawGks: Partial<Player>[] = [
+const rawGks: any[] = [
   { id: "1001", name: "Marc-André Ter Steger", age: 31, position: "GK", nationality: "Alemania", currentAbility: 5, potentialAbility: 5, marketValue: "€35M", wage: "€150K/sem", squadStatus: "titular" },
   { id: "1002", name: "Iñaki López", age: 24, position: "GK", nationality: "España", currentAbility: 3, potentialAbility: 4, marketValue: "€12M", wage: "€40K/sem", squadStatus: "suplente" },
   { id: "1003", name: "Aron Gunnarsson", age: 19, position: "GK", nationality: "Islandia", currentAbility: 2, potentialAbility: 5, marketValue: "€4M", wage: "€8K/sem", squadStatus: "juvenil" },
@@ -12,7 +12,7 @@ const rawGks: Partial<Player>[] = [
   { id: "1008", name: "Alex Werner", age: 28, position: "GK", nationality: "Argentina", currentAbility: 2, potentialAbility: 2, marketValue: "€600K", wage: "€18K/sem", squadStatus: "no_asignado" }
 ];
 
-const rawDefs: Partial<Player>[] = [
+const rawDefs: any[] = [
   // Central Defenders (D C)
   { id: "2001", name: "Ronaldo Araújo", age: 25, position: "D (C)", nationality: "Uruguay", currentAbility: 5, potentialAbility: 5, marketValue: "€75M", wage: "€180K/sem", squadStatus: "titular" },
   { id: "2002", name: "Pau Cubarsí", age: 17, position: "D (C)", nationality: "España", currentAbility: 3, potentialAbility: 5, marketValue: "€30M", wage: "€20K/sem", squadStatus: "juvenil" },
@@ -45,7 +45,7 @@ const rawDefs: Partial<Player>[] = [
   { id: "2206", name: "Andrés Herrera", age: 25, position: "D (R)", nationality: "Argentina", currentAbility: 2, potentialAbility: 2, marketValue: "€2M", wage: "€15K/sem", squadStatus: "vender" }
 ];
 
-const rawMids: Partial<Player>[] = [
+const rawMids: any[] = [
   // Defensive Midfielders (DM)
   { id: "3001", name: "Oriol Romeu", age: 32, position: "DM", nationality: "España", currentAbility: 3, potentialAbility: 3, marketValue: "€5M", wage: "€75K/sem", squadStatus: "vender" },
   { id: "3002", name: "Marc Casadó", age: 20, position: "DM", nationality: "España", currentAbility: 2, potentialAbility: 4, marketValue: "€4M", wage: "€12K/sem", squadStatus: "suplente" },
@@ -74,7 +74,7 @@ const rawMids: Partial<Player>[] = [
   { id: "3205", name: "Franco Mastantuono", age: 16, position: "AM (C)", nationality: "Argentina", currentAbility: 2, potentialAbility: 5, marketValue: "€20M", wage: "€8K/sem", squadStatus: "no_asignado" }
 ];
 
-const rawAtts: Partial<Player>[] = [
+const rawAtts: any[] = [
   // Attacking Midfielders Left (AM L)
   { id: "4001", name: "Ferran Torres", age: 24, position: "AM (L)", nationality: "España", currentAbility: 3, potentialAbility: 4, marketValue: "€35M", wage: "€100K/sem", squadStatus: "suplente" },
   { id: "4002", name: "Ansu Fati", age: 21, position: "AM (L)", nationality: "España", currentAbility: 3, potentialAbility: 4, marketValue: "€25M", wage: "€120K/sem", squadStatus: "vender" },
@@ -103,8 +103,11 @@ const rawAtts: Partial<Player>[] = [
 const combinedList: Player[] = [];
 
 // Helper function to fill missing details and build a perfect list
-const addPlayers = (list: Partial<Player>[]) => {
+const addPlayers = (list: any[]) => {
   for (const p of list) {
+    let status = p.squadStatus || "no_asignado";
+    if (status === "cedido") status = "cesion";
+    if (status === "vender") status = "venta";
     combinedList.push({
       id: p.id || Math.random().toString(),
       name: p.name || "Jugador Desconocido",
@@ -115,7 +118,7 @@ const addPlayers = (list: Partial<Player>[]) => {
       potentialAbility: p.potentialAbility || 3,
       marketValue: p.marketValue || "€1.5M",
       wage: p.wage || "€10K/sem",
-      squadStatus: p.squadStatus || "no_asignado",
+      squadStatus: status as any,
       notes: ""
     });
   }
@@ -156,7 +159,7 @@ while (combinedList.length < 112) {
     potentialAbility: pa,
     marketValue,
     wage,
-    squadStatus: isProspect ? "cedido" : "no_asignado",
+    squadStatus: isProspect ? "cesion" : "no_asignado",
     notes: isProspect ? "Gran proyección de la cantera" : ""
   });
 }
