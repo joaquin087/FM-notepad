@@ -4,7 +4,9 @@ on:
   push:
     branches:
       - main
+      - master
 
+# Permisos para desplegar en GitHub Pages
 permissions:
   contents: read
   pages: write
@@ -28,10 +30,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          # Quitamos la línea de cache: 'npm' para que no busque el package-lock.json
 
       - name: Install dependencies 🔧
-        run: npm ci
+        run: npm install # Usamos 'npm install' en lugar de 'npm ci' para que no falle si falta el lockfile
 
       - name: Build app 🚀
         run: npm run build
