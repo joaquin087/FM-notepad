@@ -96,21 +96,24 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
     if (!customRating) return stars * 20;
     const clean = customRating.trim();
     
-    // Look for percentage inside parentheses first, e.g. "3.5 (87.9%)" -> "87.9%"
-    const match = clean.match(/\(([^%)]+%)?\)/) || clean.match(/\(([^)]+)\)/);
-    const contentToParse = match ? match[1] : clean;
-    
-    if (contentToParse.includes('%')) {
-      const parsed = parseFloat(contentToParse.replace('%', '').trim().replace(',', '.'));
+    // 1. Try to find any percentage format anywhere in the string, e.g. "91,3%" or "(87.9%)"
+    const pctMatch = clean.match(/(\d+[,.]?\d*)\s*%/);
+    if (pctMatch) {
+      const parsed = parseFloat(pctMatch[1].replace(',', '.'));
       if (!isNaN(parsed)) return parsed;
     }
     
-    const num = parseFloat(contentToParse.replace(',', '.'));
-    if (!isNaN(num)) {
-      if (num <= 5) return num * 20; // 1-5 star scale
-      if (num <= 100) return num; // Already 0-100 percentage
-      return (num / 200) * 100; // 1-200 scale
+    // 2. Fallback to extracting the first numeric value
+    const numMatch = clean.match(/(\d+[,.]?\d*)/);
+    if (numMatch) {
+      const num = parseFloat(numMatch[1].replace(',', '.'));
+      if (!isNaN(num)) {
+        if (num <= 5) return num * 20; // 1-5 star scale
+        if (num <= 100) return num; // Already 0-100 scale
+        return (num / 200) * 100; // 1-200 scale
+      }
     }
+    
     return stars * 20;
   };
 
@@ -363,7 +366,8 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                 {isHalf && (
                   <div className="absolute top-0 left-0 w-1/2 overflow-hidden h-3.5">
                     <Star 
-                      className="w-3.5 h-3.5 fill-amber-400 text-amber-400" 
+                      className="w-3.5 h-3.5 fill-amber-400 text-amber-400 absolute top-0 left-0" 
+                      style={{ minWidth: '14px', width: '14px' }}
                     />
                   </div>
                 )}

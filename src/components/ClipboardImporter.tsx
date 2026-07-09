@@ -13,39 +13,32 @@ const parseImportedRating = (valStr: string): { stars: number; raw: string } => 
   const clean = valStr.trim();
   if (!clean) return { stars: 2, raw: "" };
 
-  // 1. Try to see if there is a percentage inside parentheses, e.g. "3.5 (87.9%)"
-  const matchPctInParens = clean.match(/\(([^%)]+%)?\)/) || clean.match(/\(([^)]+)\)/);
-  if (matchPctInParens) {
-    const inside = matchPctInParens[1].replace('%', '').trim().replace(',', '.');
-    const parsedPct = parseFloat(inside);
+  // 1. Try to find any percentage format anywhere in the string, e.g. "91,3%" or "(87.9%)"
+  const pctMatch = clean.match(/(\d+[,.]?\d*)\s*%/);
+  if (pctMatch) {
+    const parsedPct = parseFloat(pctMatch[1].replace(',', '.'));
     if (!isNaN(parsedPct)) {
       const stars = Math.max(0, Math.min(5, Math.round((parsedPct / 100) * 10) / 2));
       return { stars, raw: clean };
     }
   }
 
-  // 2. Try to see if the whole string is a percentage, e.g. "87.9%"
-  if (clean.includes('%')) {
-    const parsedPct = parseFloat(clean.replace('%', '').trim().replace(',', '.'));
-    if (!isNaN(parsedPct)) {
-      const stars = Math.max(0, Math.min(5, Math.round((parsedPct / 100) * 10) / 2));
-      return { stars, raw: clean };
+  // 2. Try to parse first numeric value, e.g. "4.5" or "150" or "87"
+  const numMatch = clean.match(/(\d+[,.]?\d*)/);
+  if (numMatch) {
+    const num = parseFloat(numMatch[1].replace(',', '.'));
+    if (!isNaN(num)) {
+      if (num <= 5) {
+        return { stars: num, raw: `${(num * 20).toFixed(0)}%` };
+      }
+      if (num <= 100) {
+        const stars = Math.max(0, Math.min(5, Math.round((num / 100) * 10) / 2));
+        return { stars, raw: `${num}%` };
+      }
+      const pct = (num / 200) * 100;
+      const stars = Math.max(0, Math.min(5, Math.round((pct / 100) * 10) / 2));
+      return { stars, raw: `${pct.toFixed(0)}%` };
     }
-  }
-
-  // 3. Try to parse as raw number
-  const num = parseFloat(clean.replace(',', '.'));
-  if (!isNaN(num)) {
-    if (num <= 5) {
-      return { stars: num, raw: `${(num * 20).toFixed(0)}%` };
-    }
-    if (num <= 100) {
-      const stars = Math.max(0, Math.min(5, Math.round((num / 100) * 10) / 2));
-      return { stars, raw: `${num}%` };
-    }
-    const pct = (num / 200) * 100;
-    const stars = Math.max(0, Math.min(5, Math.round((pct / 100) * 10) / 2));
-    return { stars, raw: `${pct.toFixed(0)}%` };
   }
 
   return { stars: 2, raw: clean };
@@ -229,15 +222,17 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount, gameDa
               if (val.includes("*")) {
                 currentAbility = val.split('*').length - 1;
               } else {
-                const num = parseInt(val);
-                if (!isNaN(num)) currentAbility = num > 5 ? Math.round((num / 200) * 5) : num;
+                const res = parseImportedRating(val);
+                bestRating = res.raw;
+                currentAbility = res.stars;
               }
             } else if (header.includes("pa") || header.includes("potencial") || header.includes("potential") || header.includes("pot")) {
               if (val.includes("*")) {
                 potentialAbility = val.split('*').length - 1;
               } else {
-                const num = parseInt(val);
-                if (!isNaN(num)) potentialAbility = num > 5 ? Math.round((num / 200) * 5) : num;
+                const res = parseImportedRating(val);
+                bestPotRating = res.raw;
+                potentialAbility = res.stars;
               }
             }
           });

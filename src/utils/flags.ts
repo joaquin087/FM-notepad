@@ -97,17 +97,26 @@ export const formatRatingWithPercentage = (starsCount: number, customRating?: st
   let pct = `${(starsCount * 20).toFixed(1)}%`;
   
   if (customRating) {
-    if (customRating.includes('%')) {
+    const pctMatch = customRating.match(/(\d+[,.]?\d*)\s*%/);
+    if (pctMatch) {
       pct = customRating;
     } else {
-      const parsed = parseFloat(customRating);
-      if (!isNaN(parsed)) {
-        pct = parsed <= 100 ? `${parsed.toFixed(1)}%` : `${((parsed / 200) * 100).toFixed(1)}%`;
+      const numMatch = customRating.match(/(\d+[,.]?\d*)/);
+      if (numMatch) {
+        const num = parseFloat(numMatch[1].replace(',', '.'));
+        if (!isNaN(num)) {
+          pct = num <= 5 ? `${(num * 20).toFixed(1)}%` : num <= 100 ? `${num.toFixed(1)}%` : `${((num / 200) * 100).toFixed(1)}%`;
+        }
       }
     }
   }
   
-  return `${"★".repeat(starsCount)}${"☆".repeat(5 - starsCount)} (${pct})`;
+  const filledCount = Math.floor(starsCount);
+  const hasHalf = starsCount % 1 >= 0.5;
+  const emptyCount = Math.max(0, 5 - filledCount - (hasHalf ? 1 : 0));
+  
+  const starsStr = "★".repeat(filledCount) + (hasHalf ? "½" : "") + "☆".repeat(emptyCount);
+  return `${starsStr} (${pct})`;
 };
 
 // Helper to calculate age based on Date of Birth and the exact current game date (fallback to year subtraction if date format mismatch)

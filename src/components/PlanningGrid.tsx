@@ -18,7 +18,8 @@ import {
   Bookmark,
   TrendingUp,
   Sliders,
-  DollarSign
+  DollarSign,
+  Star
 } from 'lucide-react';
 
 interface PlanningGridProps {
@@ -55,13 +56,13 @@ export const SQUAD_CATEGORIES = [
 
 export const POSITION_COLUMNS = [
   { key: 'GK', label: 'GK', name: 'Arquero' },
-  { key: 'WL', label: 'D (L)', name: 'Lateral Izquierdo' },
-  { key: 'WR', label: 'D (R)', name: 'Lateral Derecho' },
   { key: 'DFCI', label: 'D (CL)', name: 'Central Izquierdo' },
   { key: 'DFCD', label: 'D (CR)', name: 'Central Derecho' },
+  { key: 'WL', label: 'D (L)', name: 'Lateral Izquierdo' },
+  { key: 'WR', label: 'D (R)', name: 'Lateral Derecho' },
   { key: 'DM', label: 'DM', name: 'Pivote Defensivo' },
   { key: 'MC', label: 'MC', name: 'Mediocentro' },
-  { key: 'MPC', label: 'AM(C)', name: 'Mediapunta Centro' },
+  { key: 'MPC', label: 'AM (C)', name: 'Mediapunta Centro' },
   { key: 'MPI', label: 'AM (L)', name: 'Extremo Izquierdo' },
   { key: 'MPD', label: 'AM (R)', name: 'Extremo Derecho' },
   { key: 'DLC', label: 'ST (C)', name: 'Delantero Centro' }
@@ -110,6 +111,38 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, ga
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [filterUnassignedOnly, setFilterUnassignedOnly] = useState(true);
+
+  // High-fidelity half-star renderer
+  const renderVisualStars = (starsCount: number, colorClass: string = 'text-amber-400', fillClass: string = 'fill-amber-400') => {
+    return (
+      <div className="flex gap-0.5">
+        {Array.from({ length: 5 }).map((_, i) => {
+          const isFilled = i < Math.floor(starsCount);
+          const isHalf = !isFilled && (starsCount - i >= 0.5);
+          return (
+            <div key={i} className="relative w-3.5 h-3.5 flex items-center justify-center">
+              <Star 
+                className="w-3.5 h-3.5 text-slate-800 absolute" 
+              />
+              {isFilled && (
+                <Star 
+                  className={`w-3.5 h-3.5 ${fillClass} ${colorClass} absolute`} 
+                />
+              )}
+              {isHalf && (
+                <div className="absolute top-0 left-0 w-1/2 overflow-hidden h-3.5">
+                  <Star 
+                    className={`w-3.5 h-3.5 ${fillClass} ${colorClass} absolute top-0 left-0`} 
+                    style={{ minWidth: '14px', width: '14px' }}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   // Active players (excluding those who are Bajas)
   const activePlayers = useMemo(() => {
@@ -275,7 +308,7 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, ga
                   </th>
                   {POSITION_COLUMNS.map(col => (
                     <th key={col.key} className="p-3 text-center border-r border-slate-850/50 min-w-[115px] group">
-                      <div className="text-xs font-bold text-white tracking-wide">{col.key}</div>
+                      <div className="text-xs font-bold text-white tracking-wide">{col.label}</div>
                       <div className="text-[9px] text-slate-500 font-mono font-medium truncate max-w-[110px]" title={col.name}>
                         {col.name}
                       </div>
@@ -634,25 +667,11 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, ga
             <div className="p-4 border-b border-slate-850 flex justify-around text-xs">
               <div className="flex items-center gap-1.5">
                 <span className="text-slate-500 font-semibold">CA:</span>
-                <div className="flex text-amber-400 font-bold">
-                  {Array.from({ length: selectedPlayer.currentAbility }).map((_, i) => (
-                    <span key={i}>★</span>
-                  ))}
-                  {Array.from({ length: 5 - selectedPlayer.currentAbility }).map((_, i) => (
-                    <span key={i} className="text-slate-800">★</span>
-                  ))}
-                </div>
+                {renderVisualStars(selectedPlayer.currentAbility, 'text-amber-400', 'fill-amber-400')}
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="text-slate-500 font-semibold">PA:</span>
-                <div className="flex text-cyan-400 font-bold">
-                  {Array.from({ length: selectedPlayer.potentialAbility }).map((_, i) => (
-                    <span key={i}>★</span>
-                  ))}
-                  {Array.from({ length: 5 - selectedPlayer.potentialAbility }).map((_, i) => (
-                    <span key={i} className="text-slate-800">★</span>
-                  ))}
-                </div>
+                {renderVisualStars(selectedPlayer.potentialAbility, 'text-cyan-400', 'fill-cyan-400')}
               </div>
             </div>
 
@@ -696,7 +715,7 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, ga
                         }
                       `}
                     >
-                      {col.key}
+                      {col.label}
                     </button>
                   ))}
                 </div>
