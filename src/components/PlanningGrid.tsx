@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Player } from '../types';
-import { getFlagEmoji, isTurkishPlayer } from '../utils/flags';
+import { getFlagEmoji, isTurkishPlayer, calculateAgeFromDOB } from '../utils/flags';
 import { 
   Users, 
   Plus, 
@@ -25,6 +25,7 @@ interface PlanningGridProps {
   players: Player[];
   onUpdatePlayer: (updatedPlayer: Player) => void;
   onUpdatePlayersBatch: (updatedPlayers: Player[]) => void;
+  gameYear: number;
 }
 
 export const SQUAD_CATEGORIES = [
@@ -90,7 +91,7 @@ export const getAutoColumn = (posStr: string): string => {
   return "MC"; // Fallback
 };
 
-export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch }: PlanningGridProps) {
+export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, gameYear }: PlanningGridProps) {
   // UI states
   const [activeCell, setActiveCell] = useState<{ rowKey: string; colKey: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -328,7 +329,7 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch }: 
                                       {/* Ability, Age */}
                                       <div className="flex justify-between items-center text-[8px] font-mono mt-0.5 text-slate-400">
                                         <span className={ratingColor}>{p.currentAbility}★</span>
-                                        <span>{p.age}a</span>
+                                        <span>{calculateAgeFromDOB(p.dateOfBirth, p.age, gameYear)}a</span>
                                       </div>
 
                                       {/* Small remove icon on hover */}
@@ -439,7 +440,7 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch }: 
                         <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
                           <span className="text-emerald-400 font-bold">{p.position}</span>
                           <span>•</span>
-                          <span>{p.age} años</span>
+                          <span>{calculateAgeFromDOB(p.dateOfBirth, p.age, gameYear)} años</span>
                         </div>
                       </div>
 
@@ -604,7 +605,7 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch }: 
             <div className="grid grid-cols-3 gap-2 p-4 bg-slate-900/30 border-b border-slate-850 text-center text-xs">
               <div className="p-2 bg-slate-950 rounded-lg border border-slate-850">
                 <span className="text-[10px] text-slate-500 block uppercase font-mono">Edad</span>
-                <strong className="text-slate-200">{selectedPlayer.age} años</strong>
+                <strong className="text-slate-200">{calculateAgeFromDOB(selectedPlayer.dateOfBirth, selectedPlayer.age, gameYear)} años</strong>
               </div>
               <div className="p-2 bg-slate-950 rounded-lg border border-slate-850">
                 <span className="text-[10px] text-slate-500 block uppercase font-mono">Sueldo</span>

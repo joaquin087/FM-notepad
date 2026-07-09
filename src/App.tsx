@@ -54,6 +54,11 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [gameYear, setGameYear] = useState<number>(() => {
+    const saved = localStorage.getItem("fm_game_year");
+    return saved ? parseInt(saved, 10) : 2036;
+  });
+
   const [activeTab, setActiveTab] = useState<'squad_pitch' | 'players_list' | 'clipboard_import' | 'stats' | 'progression_tracker' | 'planning_grid'>('planning_grid');
   const [selectedPosition, setSelectedPosition] = useState<PitchPosition | null>(null);
   const [candidateSearch, setCandidateSearch] = useState('');
@@ -86,6 +91,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("fm_active_formation", activeFormationKey);
   }, [activeFormationKey]);
+
+  useEffect(() => {
+    localStorage.setItem("fm_game_year", String(gameYear));
+  }, [gameYear]);
 
   // Find active formation object
   const activeFormation = defaultFormations.find(f => f.key === activeFormationKey) || defaultFormations[0];
@@ -550,6 +559,24 @@ export default function App() {
 
         {/* Quick Info Badges in Sophisticated Dark Pill style */}
         <div className="flex flex-wrap items-center gap-2 text-xs font-sans w-full md:w-auto justify-end">
+          <div className="flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-full px-2 py-0.5 text-slate-300 select-none">
+            <span className="text-[10px] uppercase font-bold text-slate-400 font-mono px-1">Año:</span>
+            <button
+              onClick={() => setGameYear(prev => Math.max(1900, prev - 1))}
+              className="w-4.5 h-4.5 rounded-full bg-slate-950 hover:bg-slate-700 text-white font-bold flex items-center justify-center text-[10px] border border-slate-700 transition"
+              title="Restar año"
+            >
+              -
+            </button>
+            <strong className="text-white font-semibold font-mono px-1 text-[11px]">{gameYear}</strong>
+            <button
+              onClick={() => setGameYear(prev => Math.min(2100, prev + 1))}
+              className="w-4.5 h-4.5 rounded-full bg-slate-950 hover:bg-slate-700 text-white font-bold flex items-center justify-center text-[10px] border border-slate-700 transition"
+              title="Sumar año"
+            >
+              +
+            </button>
+          </div>
           <span className="px-3 py-1 bg-slate-800 rounded-full text-xs font-medium border border-slate-700 text-slate-300">
             Total: <strong className="text-white font-semibold font-sans">{totalPlayers} Jugadores</strong>
           </span>
@@ -564,7 +591,7 @@ export default function App() {
 
       {/* Primary Navigation Tabs */}
       <nav className="bg-slate-900/60 border-b border-slate-850 sticky top-0 z-40 backdrop-blur">
-        <div className="max-w-[95%] w-[95%] mx-auto px-4 flex justify-between items-center overflow-x-auto">
+        <div className="max-w-[98%] w-[98%] mx-auto px-4 flex justify-between items-center overflow-x-auto">
           <div className="flex space-x-1 py-1.5 scrollbar-none">
             <button
               onClick={() => setActiveTab('planning_grid')}
@@ -660,7 +687,7 @@ export default function App() {
       </nav>
 
       {/* Main Content Area */}
-      <main className="max-w-[95%] w-[95%] mx-auto px-4 py-5 font-sans">
+      <main className="max-w-[98%] w-[98%] mx-auto px-4 py-5 font-sans">
         
         {/* TAB 0: DETAILED PLANNING GRID MATRIX */}
         {activeTab === 'planning_grid' && (
@@ -670,6 +697,7 @@ export default function App() {
             onUpdatePlayersBatch={(updatedBatch) => {
               setPlayers(updatedBatch);
             }}
+            gameYear={gameYear}
           />
         )}
 
@@ -959,6 +987,7 @@ export default function App() {
             onDeletePlayer={handleDeletePlayer}
             onResetToDefaults={handleResetToDefaults}
             onDeleteAllPlayers={handleDeleteAllPlayers}
+            gameYear={gameYear}
           />
         )}
 

@@ -109,3 +109,56 @@ export const formatRatingWithPercentage = (starsCount: number, customRating?: st
   
   return `${"★".repeat(starsCount)}${"☆".repeat(5 - starsCount)} (${pct})`;
 };
+
+// Helper to calculate age based on Date of Birth and the current game year
+export const calculateAgeFromDOB = (dob: string | undefined, fallbackAge: number, gameYear: number): number => {
+  if (!dob || dob === 'N/A' || dob === 'N/D') return fallbackAge;
+  const clean = dob.trim();
+  if (/^\d{4}$/.test(clean)) {
+    const year = parseInt(clean);
+    if (!isNaN(year) && year >= 1900 && year <= 2100) {
+      return gameYear - year;
+    }
+  }
+  const parts = clean.split(/[\.\-\/]+/);
+  if (parts.length === 3) {
+    // Check if the 3rd part or the 1st part is the 4-digit year
+    let year = parseInt(parts[2]);
+    if (isNaN(year) || year < 100) {
+      year = parseInt(parts[0]);
+    }
+    if (!isNaN(year) && year >= 1900 && year <= 2100) {
+      return gameYear - year;
+    }
+  }
+  return fallbackAge;
+};
+
+// Helper to calculate years remaining on a contract relative to the current game year
+export const calculateContractYearsRemaining = (contractEnd: string | undefined, gameYear: number): string => {
+  if (!contractEnd || contractEnd === 'N/A' || contractEnd === 'N/D') return "N/D";
+  const clean = contractEnd.trim();
+  let year = 0;
+  
+  if (/^\d{4}$/.test(clean)) {
+    year = parseInt(clean);
+  } else {
+    const parts = clean.split(/[\.\-\/]+/);
+    if (parts.length === 3) {
+      let y = parseInt(parts[2]);
+      if (isNaN(y) || y < 100) {
+        y = parseInt(parts[0]);
+      }
+      if (!isNaN(y) && y >= 1900) {
+        year = y;
+      }
+    }
+  }
+  
+  if (year > 0) {
+    const diff = year - gameYear;
+    if (diff <= 0) return `Termina (${contractEnd})`;
+    return `${diff} ${diff === 1 ? 'año' : 'años'} (${contractEnd})`;
+  }
+  return contractEnd;
+};

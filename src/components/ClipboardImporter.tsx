@@ -12,6 +12,57 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount }: Clip
   const [importMode, setImportMode] = useState<'replace' | 'append'>('append');
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Helper to format wage and value beautifully on import
+  const formatImportedWage = (rawWage: string): string => {
+    let val = rawWage.trim();
+    if (!val) return "€10K/sem";
+    
+    if (/[kKmM]/.test(val) && /[€$£]/.test(val)) {
+      return val;
+    }
+    
+    let clean = val.replace(/[€$£\s]/g, '');
+    const rawNumStr = clean.replace(/[\.,]/g, '');
+    const num = parseInt(rawNumStr);
+    
+    if (isNaN(num)) return val;
+    
+    if (num >= 1000000) {
+      const mVal = num / 1000000;
+      return `€${mVal % 1 === 0 ? mVal.toFixed(0) : mVal.toFixed(1)}M/sem`;
+    } else if (num >= 1000) {
+      const kVal = num / 1000;
+      return `€${kVal % 1 === 0 ? kVal.toFixed(0) : kVal.toFixed(1)}K/sem`;
+    } else {
+      return `€${num}/sem`;
+    }
+  };
+
+  const formatImportedValue = (rawValue: string): string => {
+    let val = rawValue.trim();
+    if (!val) return "€2M";
+    
+    if (/[kKmM]/.test(val) && /[€$£]/.test(val)) {
+      return val;
+    }
+    
+    let clean = val.replace(/[€$£\s]/g, '');
+    const rawNumStr = clean.replace(/[\.,]/g, '');
+    const num = parseInt(rawNumStr);
+    
+    if (isNaN(num)) return val;
+    
+    if (num >= 1000000) {
+      const mVal = num / 1000000;
+      return `€${mVal % 1 === 0 ? mVal.toFixed(0) : mVal.toFixed(1)}M`;
+    } else if (num >= 1000) {
+      const kVal = num / 1000;
+      return `€${kVal % 1 === 0 ? kVal.toFixed(0) : kVal.toFixed(1)}K`;
+    } else {
+      return `€${num}`;
+    }
+  };
+
   const handleParseAndImport = () => {
     const text = pasteData.trim();
     if (!text) {
@@ -26,7 +77,22 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount }: Clip
         return;
       }
 
-      const delimiter = "\t"; // Football Manager clipboard is Tab-Separated Values (TSV)
+      // Automatically detect the delimiter (tab, pipe, semicolon, or comma)
+      const detectDelimiter = (line: string): string => {
+        const candidates = ["\t", "|", ";", ","];
+        let best = "\t";
+        let maxCount = 0;
+        candidates.forEach(cand => {
+          const count = line.split(cand).length - 1;
+          if (count > maxCount) {
+            maxCount = count;
+            best = cand;
+          }
+        });
+        return maxCount > 0 ? best : "\t";
+      };
+
+      const delimiter = detectDelimiter(lines[0]);
       const parsedPlayers: Player[] = [];
       let nextIdSeed = Date.now();
 
@@ -44,6 +110,10 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount }: Clip
       const headers = hasHeaders ? cellsInHeader : [];
 
       for (let i = startIndex; i < lines.length; i++) {
+        // Skip decorator lines or lines composed entirely of dashes/pipes/decorations
+        const cleanLine = lines[i].replace(/[| \-_=+*\s\t,;]/g, "");
+        if (cleanLine.length === 0) continue;
+
         const cells = lines[i].split(delimiter).map(c => c.trim());
         if (cells.length < 2) continue; // Skip lines with insufficient columns
 
@@ -70,52 +140,50 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount }: Clip
         if (hasHeaders) {
           headers.forEach((header, colIndex) => {
             const val = cells[colIndex];
-            if (!val) return;
+            if (val === undefined || val === null || val === "") return;
 
-            if (header.includes("id") || header === "pk" || header === "id único" || header === "uid") {
+            if (header === "club id" || header === "clubid") {
+              clubId = val;
+            } else if (header.includes("best pot rating") || header.includes("bestpotrating") || header.includes("mejor pot") || header.includes("calidad potencial %") || header === "best pot rating") {
+              bestPotRating = val;
+              const parsedPct = parseFloat(val.replace(',', '.'));
+              if (!isNaN(parsedPct)) {
+                potentialAbility = Math.max(1, Math.min(5, Math.round((parsedPct / 100) * 5)));
+              }
+            } else if (header.includes("best rating") || header.includes("bestrating") || header.includes("mejor cal") || header.includes("calidad actual %") || header.includes("calidad de juego") || header === "best rating") {
+              bestRating = val;
+              const parsedPct = parseFloat(val.replace(',', '.'));
+              if (!isNaN(parsedPct)) {
+                currentAbility = Math.max(1, Math.min(5, Math.round((parsedPct / 100) * 5)));
+              }
+            } else if (header === "unique id" || header === "uid" || header === "id único" || header === "id" || header === "pk" || (header.includes("id") && !header.includes("club"))) {
               id = val;
             } else if (header.includes("nombre") || header.includes("name") || header === "nom") {
               name = val;
-            } else if (header.includes("edad") || header.includes("age") || header === "eda") {
+            } else if (header === "edad" || header === "age" || header === "eda" || (header.includes("age") && !header.includes("wage") && !header.includes("percentage"))) {
               const parsedAge = parseInt(val);
               if (!isNaN(parsedAge)) age = parsedAge;
-            } else if (header.includes("pos") || header === "puesto") {
+            } else if (header.includes("pos") || header === "puesto" || header === "position") {
               position = val;
             } else if (header.includes("nacionalidad") || header.includes("nac") || header.includes("nat") || header.includes("país") || header.includes("nation")) {
               nationality = val;
             } else if (header.includes("valor") || header.includes("value") || header === "val") {
-              marketValue = val;
+              marketValue = formatImportedValue(val);
             } else if (header.includes("sueldo") || header.includes("wage") || header.includes("sal") || header.includes("contrato")) {
-              wage = val;
-            } else if (header.includes("club")) {
+              wage = formatImportedWage(val);
+            } else if (header === "club") {
               club = val;
             } else if (header.includes("sale value") || header.includes("valor de venta") || header.includes("salevalue")) {
               saleValue = val;
-            } else if (header.includes("best rating") || header.includes("mejor cal") || header.includes("bestrating") || header.includes("calidad actual %") || header.includes("calidad de juego")) {
-              bestRating = val;
-              // If we have a percentage, let's estimate the stars
-              const parsedPct = parseFloat(val);
-              if (!isNaN(parsedPct) && parsedPct <= 100) {
-                currentAbility = Math.max(1, Math.min(5, Math.round((parsedPct / 100) * 5)));
-              }
-            } else if (header.includes("best pot rating") || header.includes("mejor pot") || header.includes("bestpotrating") || header.includes("calidad potencial %")) {
-              bestPotRating = val;
-              const parsedPct = parseFloat(val);
-              if (!isNaN(parsedPct) && parsedPct <= 100) {
-                potentialAbility = Math.max(1, Math.min(5, Math.round((parsedPct / 100) * 5)));
-              }
             } else if (header.includes("contract end") || header.includes("fin contr") || header.includes("contractend") || header.includes("vence")) {
               contractEnd = val;
             } else if (header.includes("date of birth") || header.includes("fecha nac") || header.includes("dob") || header.includes("nacimiento")) {
               dateOfBirth = val;
-            } else if (header.includes("club id") || header.includes("clubid")) {
-              clubId = val;
             } else if (header.includes("int caps") || header.includes("partidos int") || header.includes("intcaps")) {
               intCaps = parseInt(val) || 0;
             } else if (header.includes("int goals") || header.includes("goles int") || header.includes("intgoals")) {
               intGoals = parseInt(val) || 0;
             } else if (header.includes("ca") || header.includes("calidad actual") || header.includes("ability") || header.includes("cur")) {
-              // Convert stars or scale
               if (val.includes("*")) {
                 currentAbility = val.split('*').length - 1;
               } else {
@@ -150,9 +218,9 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount }: Clip
             // 3. Check for currency values (Value or Wage)
             else if (/[€$£M|K|d]/.test(val)) {
               if (val.toLowerCase().includes("sem") || val.toLowerCase().includes("w") || val.toLowerCase().includes("/s") || val.toLowerCase().includes("semana")) {
-                wage = val;
+                wage = formatImportedWage(val);
               } else {
-                marketValue = val;
+                marketValue = formatImportedValue(val);
               }
             }
             // 4. Check for standard positions keywords
@@ -183,11 +251,13 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount }: Clip
         marketValue = marketValue || "€2M";
         wage = wage || "€10K/sem";
 
+        const mappedPosition = mapBestRatingToPosition(bestRating, position);
+
         parsedPlayers.push({
           id,
           name,
           age,
-          position: cleanFmPosition(position),
+          position: cleanFmPosition(mappedPosition),
           nationality,
           currentAbility: Math.max(1, Math.min(5, currentAbility)),
           potentialAbility: Math.max(1, Math.min(5, potentialAbility)),
@@ -226,19 +296,67 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount }: Clip
     }
   };
 
+  // Helper to map Best Rating column tag to our standard positions
+  const mapBestRatingToPosition = (bestRatingStr: string, rawFmPosition: string): string => {
+    if (!bestRatingStr) return rawFmPosition;
+    
+    // Extract tag inside parenthesis if present, e.g., "91,3% (W)" -> "W"
+    const match = bestRatingStr.match(/\(([^)]+)\)/);
+    const tag = (match ? match[1] : bestRatingStr).toUpperCase().trim();
+    
+    if (tag === "GK" || tag === "POR") return "GK";
+    
+    // FB -> DFI or DFD (Must be WR or WL, corresponding to D (L) or D (R) in our database)
+    if (tag === "FB" || tag === "DFI" || tag === "DFD" || tag === "SB") {
+      const upperRaw = rawFmPosition.toUpperCase();
+      const upperBest = bestRatingStr.toUpperCase();
+      if (upperRaw.includes("L") || upperRaw.includes("I") || upperBest.includes("L") || upperBest.includes("I")) {
+        return "D (L)";
+      }
+      return "D (R)";
+    }
+    
+    // CB -> DFC I or DFC D (Merge to DFC / D (C))
+    if (tag === "CB" || tag === "DFC" || tag === "CD") return "D (C)";
+    
+    // DM -> MCD ("DM")
+    if (tag === "DM" || tag === "MCD") return "DM";
+    
+    // M -> MC D ("M (C)")
+    if (tag === "M" || tag === "MC" || tag === "MC D" || tag === "MCC") return "M (C)";
+    
+    // AM -> MC I (mapped to "AM (C)")
+    if (tag === "AM" || tag === "AMC" || tag === "MC I") return "AM (C)";
+    
+    // W -> MPI or MPD ("AM (L)" or "AM (R)")
+    if (tag === "W" || tag === "MPI" || tag === "MPD" || tag === "WING") {
+      const upperRaw = rawFmPosition.toUpperCase();
+      const upperBest = bestRatingStr.toUpperCase();
+      if (upperRaw.includes("L") || upperRaw.includes("I") || upperBest.includes("L") || upperBest.includes("I")) {
+        return "AM (L)";
+      }
+      return "AM (R)";
+    }
+    
+    // FS or TS -> DL ("ST (C)")
+    if (tag === "FS" || tag === "TS" || tag === "ST" || tag === "DL") return "ST (C)";
+    
+    return rawFmPosition;
+  };
+
   // Helper to map complex FM positions to our compact pitch positions
   const cleanFmPosition = (pos: string): string => {
     const upper = pos.toUpperCase();
     if (upper.includes("GK") || upper.includes("POR")) return "GK";
-    if (upper.includes("D (C)") || upper.includes("DFC")) return "D (C)";
-    if (upper.includes("D (L)") || upper.includes("DF I") || upper.includes("LI") || upper.includes("DFL")) return "D (L)";
-    if (upper.includes("D (R)") || upper.includes("DF D") || upper.includes("LD") || upper.includes("DFR")) return "D (R)";
+    if (upper.includes("D (C)") || upper.includes("DFC") || upper.includes("D C") || upper === "DC") return "D (C)";
+    if (upper.includes("D (L)") || upper.includes("DF I") || upper.includes("LI") || upper.includes("DFL") || upper.includes("WB (L)") || upper.includes("WBL") || upper.includes("D L") || upper.includes("WB L")) return "D (L)";
+    if (upper.includes("D (R)") || upper.includes("DF D") || upper.includes("LD") || upper.includes("DFR") || upper.includes("WB (R)") || upper.includes("WBR") || upper.includes("D R") || upper.includes("WB R")) return "D (R)";
     if (upper.includes("DM") || upper.includes("MCD")) return "DM";
-    if (upper.includes("M (C)") || upper.includes("MC")) return "M (C)";
-    if (upper.includes("AM (L)") || upper.includes("MP I") || upper.includes("AML") || upper.includes("EXT I")) return "AM (L)";
-    if (upper.includes("AM (R)") || upper.includes("MP D") || upper.includes("AMR") || upper.includes("EXT D")) return "AM (R)";
-    if (upper.includes("AM (C)") || upper.includes("ENG") || upper.includes("AMC") || upper.includes("MP C")) return "AM (C)";
-    if (upper.includes("ST") || upper.includes("DL") || upper.includes("STC") || upper.includes("ST (C)")) return "ST (C)";
+    if (upper.includes("M (C)") || upper.includes("MC") || upper.includes("M C")) return "M (C)";
+    if (upper.includes("AM (L)") || upper.includes("MP I") || upper.includes("AML") || upper.includes("EXT I") || upper.includes("AM L") || upper.includes("AMP L") || upper.includes("MP L")) return "AM (L)";
+    if (upper.includes("AM (R)") || upper.includes("MP D") || upper.includes("AMR") || upper.includes("EXT D") || upper.includes("AM R") || upper.includes("AMP R") || upper.includes("MP R")) return "AM (R)";
+    if (upper.includes("AM (C)") || upper.includes("ENG") || upper.includes("AMC") || upper.includes("MP C") || upper.includes("AM C") || upper.includes("MP C")) return "AM (C)";
+    if (upper.includes("ST") || upper.includes("DL") || upper.includes("STC") || upper.includes("ST (C)") || upper.includes("F C") || upper.includes("FC")) return "ST (C)";
     return pos; // Fallback
   };
 

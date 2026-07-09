@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Player } from '../types';
-import { getFlagEmoji, isTurkishPlayer, formatRatingWithPercentage, getPlayerFlags } from '../utils/flags';
+import { getFlagEmoji, isTurkishPlayer, formatRatingWithPercentage, getPlayerFlags, calculateAgeFromDOB, calculateContractYearsRemaining } from '../utils/flags';
 import { Search, Filter, Plus, Trash2, Edit3, Check, X, Star, AlertCircle, RefreshCw, Trash } from 'lucide-react';
 
 interface RosterManagerProps {
@@ -10,9 +10,10 @@ interface RosterManagerProps {
   onDeletePlayer: (id: string) => void;
   onResetToDefaults: () => void;
   onDeleteAllPlayers: () => void;
+  gameYear: number;
 }
 
-export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePlayer, onResetToDefaults, onDeleteAllPlayers }: RosterManagerProps) {
+export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePlayer, onResetToDefaults, onDeleteAllPlayers, gameYear }: RosterManagerProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [positionFilter, setPositionFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -60,6 +61,35 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
     return numberPart;
   };
 
+  // Helper to parse ability input (stars, percentage or 1-200 score)
+  const parseAbilityInput = (valStr: string): { stars: number; rawRating: string } => {
+    const clean = valStr.trim();
+    if (!clean) return { stars: 2, rawRating: '' };
+    
+    // If it contains percentage
+    if (clean.includes('%')) {
+      const parsedPct = parseFloat(clean);
+      if (!isNaN(parsedPct)) {
+        const stars = Math.max(1, Math.min(5, Math.round((parsedPct / 100) * 5)));
+        return { stars, rawRating: clean };
+      }
+    }
+
+    const num = parseInt(clean);
+    if (isNaN(num)) {
+      return { stars: 2, rawRating: '' };
+    }
+
+    if (num > 5) {
+      // scale 1-200
+      const stars = Math.max(1, Math.min(5, Math.round((num / 200) * 5)));
+      return { stars, rawRating: String(num) };
+    } else {
+      // stars (1-5)
+      return { stars: Math.max(1, Math.min(5, num)), rawRating: String(num) };
+    }
+  };
+
   // New player temporary state
   const [newPlayer, setNewPlayer] = useState<Omit<Player, 'id'>>({
     name: '',
@@ -71,8 +101,23 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
     marketValue: '€1.5M',
     wage: '€8K/sem',
     squadStatus: 'no_asignado',
-    notes: ''
+    notes: '',
+    contractEnd: '30/6/2028',
+    dateOfBirth: '18/12/2001',
+    club: '',
+    bestRating: '',
+    bestPotRating: ''
   });
+
+  const [newCaInput, setNewCaInput] = useState('120');
+  const [newPaInput, setNewPaInput] = useState('160');
+  const [customId, setCustomId] = useState('');
+  const [contractEndInput, setContractEndInput] = useState('30/6/2028');
+  const [dateOfBirthInput, setDateOfBirthInput] = useState('18/12/2001');
+  const [clubInput, setClubInput] = useState('');
+
+  const [editCaInput, setEditCaInput] = useState('');
+  const [editPaInput, setEditPaInput] = useState('');
 
   // Unique list of positions for filter
   const positionsList = ['ALL', 'GK', 'D (C)', 'D (L)', 'D (R)', 'DM', 'M (C)', 'AM (L)', 'AM (R)', 'AM (C)', 'ST (C)'];
@@ -183,6 +228,8 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
 
   const handleEditClick = (player: Player) => {
     setEditingPlayer({ ...player });
+    setEditCaInput(player.bestRating || String(player.currentAbility * 40));
+    setEditPaInput(player.bestPotRating || String(player.potentialAbility * 40));
     setFormError('');
   };
 
@@ -192,7 +239,19 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
         setFormError("El nombre del jugador es requerido.");
         return;
       }
-      onUpdatePlayer(editingPlayer);
+      
+      const parsedCa = parseAbilityInput(editCaInput);
+      const parsedPa = parseAbilityInput(editPaInput);
+
+      const updatedPlayer: Player = {
+        ...editingPlayer,
+        currentAbility: parsedCa.stars,
+        potentialAbility: parsedPa.stars,
+        bestRating: parsedCa.rawRating,
+        bestPotRating: parsedPa.rawRating,
+      };
+
+      onUpdatePlayer(updatedPlayer);
       setEditingPlayer(null);
       setFormError('');
     }
@@ -203,10 +262,20 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
       setFormError("El nombre del jugador es requerido.");
       return;
     }
-    const generatedId = String(Date.now());
+    const generatedId = customId.trim() || String(Date.now());
+    const parsedCa = parseAbilityInput(newCaInput);
+    const parsedPa = parseAbilityInput(newPaInput);
+
     onAddPlayer({
       ...newPlayer,
-      id: generatedId
+      id: generatedId,
+      currentAbility: parsedCa.stars,
+      potentialAbility: parsedPa.stars,
+      bestRating: parsedCa.rawRating,
+      bestPotRating: parsedPa.rawRating,
+      contractEnd: contractEndInput.trim() || 'N/A',
+      dateOfBirth: dateOfBirthInput.trim() || 'N/A',
+      club: clubInput.trim() || 'N/A'
     });
     setIsAdding(false);
     setFormError('');
@@ -221,8 +290,19 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
       marketValue: '€1.5M',
       wage: '€8K/sem',
       squadStatus: 'no_asignado',
-      notes: ''
+      notes: '',
+      contractEnd: '30/6/2028',
+      dateOfBirth: '18/12/2001',
+      club: '',
+      bestRating: '',
+      bestPotRating: ''
     });
+    setNewCaInput('120');
+    setNewPaInput('160');
+    setCustomId('');
+    setContractEndInput('30/6/2028');
+    setDateOfBirthInput('18/12/2001');
+    setClubInput('');
   };
 
   // Helper to render beautiful yellow stars with percentage
@@ -271,12 +351,12 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
     );
   };
 
-  const renderSortHeader = (field: string, label: string) => {
+  const renderSortHeader = (field: string, label: string, extraClass: string = '') => {
     const isSorted = sortField === field;
     return (
       <th 
         onClick={() => handleSort(field)}
-        className="px-3 py-3 font-semibold text-slate-400 hover:text-white cursor-pointer select-none transition group/hdr"
+        className={`px-3 py-3 font-semibold text-slate-400 hover:text-white cursor-pointer select-none transition group/hdr ${extraClass}`}
       >
         <div className="flex items-center gap-1.5">
           <span>{label}</span>
@@ -433,6 +513,16 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
             <div>
+              <label className="text-[10px] text-slate-400">ID Único (FMRD)</label>
+              <input
+                type="text"
+                placeholder="Opcional (se auto-genera)"
+                value={customId}
+                onChange={(e) => setCustomId(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100"
+              />
+            </div>
+            <div>
               <label className="text-[10px] text-slate-400">Nombre Completo</label>
               <input
                 type="text"
@@ -465,41 +555,28 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                 className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100"
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
             <div>
               <label className="text-[10px] text-slate-400">Nacionalidad</label>
               <input
                 type="text"
+                placeholder="Ej. Argentina"
                 value={newPlayer.nationality}
                 onChange={(e) => setNewPlayer({ ...newPlayer, nationality: e.target.value })}
                 className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100"
               />
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
             <div>
-              <label className="text-[10px] text-slate-400">Calidad Actual (1-5)</label>
-              <select
-                value={newPlayer.currentAbility}
-                onChange={(e) => setNewPlayer({ ...newPlayer, currentAbility: parseInt(e.target.value) })}
-                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 cursor-pointer"
-              >
-                {[1, 2, 3, 4, 5].map(val => (
-                  <option key={val} value={val}>{val} {val === 1 ? 'Estrella' : 'Estrellas'}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] text-slate-400">Potencial (1-5)</label>
-              <select
-                value={newPlayer.potentialAbility}
-                onChange={(e) => setNewPlayer({ ...newPlayer, potentialAbility: parseInt(e.target.value) })}
-                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 cursor-pointer"
-              >
-                {[1, 2, 3, 4, 5].map(val => (
-                  <option key={val} value={val}>{val} {val === 1 ? 'Estrella' : 'Estrellas'}</option>
-                ))}
-              </select>
+              <label className="text-[10px] text-slate-400">Club Actual</label>
+              <input
+                type="text"
+                placeholder="Ej. Galatasaray"
+                value={clubInput}
+                onChange={(e) => setClubInput(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100"
+              />
             </div>
             <div>
               <label className="text-[10px] text-slate-400">Valor de Mercado</label>
@@ -517,6 +594,55 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                 value={newPlayer.wage}
                 onChange={(e) => setNewPlayer({ ...newPlayer, wage: e.target.value })}
                 className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
+            <div>
+              <label className="text-[10px] text-slate-400">Fecha Fin Contrato</label>
+              <input
+                type="text"
+                placeholder="Ej. 30/6/2028"
+                value={contractEndInput}
+                onChange={(e) => setContractEndInput(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-slate-400">Fecha Nacimiento</label>
+              <input
+                type="text"
+                placeholder="Ej. 18/12/2001"
+                value={dateOfBirthInput}
+                onChange={(e) => setDateOfBirthInput(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-slate-400 flex justify-between">
+                <span>Calidad Actual (CA)</span>
+                <span className="text-slate-500 font-mono">1-200 o stars</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Ej. 135"
+                value={newCaInput}
+                onChange={(e) => setNewCaInput(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-850 rounded p-1.5 text-slate-100 font-mono"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-slate-400 flex justify-between">
+                <span>Potencial (PA)</span>
+                <span className="text-slate-500 font-mono">1-200 o stars</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Ej. 160"
+                value={newPaInput}
+                onChange={(e) => setNewPaInput(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-850 rounded p-1.5 text-slate-100 font-mono"
               />
             </div>
           </div>
@@ -548,11 +674,14 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
       {/* Editing Player Inline Modal overlay */}
       {editingPlayer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl p-6 shadow-2xl space-y-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                ✍️ Editar Ficha del Jugador
-              </h3>
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  ✍️ Editar Ficha del Jugador
+                </h3>
+                <span className="text-[10px] font-mono text-slate-500">ID Único: {editingPlayer.id}</span>
+              </div>
               <button onClick={() => setEditingPlayer(null)} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
@@ -565,8 +694,8 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div>
                 <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Nombre</label>
                 <input
                   type="text"
@@ -581,7 +710,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                 <select
                   value={editingPlayer.position}
                   onChange={(e) => setEditingPlayer({ ...editingPlayer, position: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1"
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1 cursor-pointer"
                 >
                   {positionsList.filter(p => p !== 'ALL').map(p => (
                     <option key={p} value={p}>{p}</option>
@@ -610,6 +739,16 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
               </div>
 
               <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Club Actual</label>
+                <input
+                  type="text"
+                  value={editingPlayer.club || ''}
+                  onChange={(e) => setEditingPlayer({ ...editingPlayer, club: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1"
+                />
+              </div>
+
+              <div>
                 <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Sueldo semanal</label>
                 <input
                   type="text"
@@ -620,38 +759,58 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
               </div>
 
               <div>
-                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Calidad Actual (1-5)</label>
-                <select
-                  value={editingPlayer.currentAbility}
-                  onChange={(e) => setEditingPlayer({ ...editingPlayer, currentAbility: parseInt(e.target.value) })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1"
-                >
-                  {[1, 2, 3, 4, 5].map(val => (
-                    <option key={val} value={val}>{val} {val === 1 ? 'Estrella' : 'Estrellas'}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Calidad Potencial (1-5)</label>
-                <select
-                  value={editingPlayer.potentialAbility}
-                  onChange={(e) => setEditingPlayer({ ...editingPlayer, potentialAbility: parseInt(e.target.value) })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1"
-                >
-                  {[1, 2, 3, 4, 5].map(val => (
-                    <option key={val} value={val}>{val} {val === 1 ? 'Estrella' : 'Estrellas'}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
                 <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Valor de mercado</label>
                 <input
                   type="text"
                   value={editingPlayer.marketValue}
                   onChange={(e) => setEditingPlayer({ ...editingPlayer, marketValue: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Fecha Fin Contrato</label>
+                <input
+                  type="text"
+                  value={editingPlayer.contractEnd || ''}
+                  onChange={(e) => setEditingPlayer({ ...editingPlayer, contractEnd: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Fecha de Nacimiento</label>
+                <input
+                  type="text"
+                  value={editingPlayer.dateOfBirth || ''}
+                  onChange={(e) => setEditingPlayer({ ...editingPlayer, dateOfBirth: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans flex justify-between">
+                  <span>Calidad Actual (CA)</span>
+                  <span className="text-slate-500 font-mono">1-200 o stars</span>
+                </label>
+                <input
+                  type="text"
+                  value={editCaInput}
+                  onChange={(e) => setEditCaInput(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 font-mono mt-1"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans flex justify-between">
+                  <span>Calidad Potencial (PA)</span>
+                  <span className="text-slate-500 font-mono">1-200 o stars</span>
+                </label>
+                <input
+                  type="text"
+                  value={editPaInput}
+                  onChange={(e) => setEditPaInput(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 font-mono mt-1"
                 />
               </div>
 
@@ -677,7 +836,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
               </div>
 
               {editingPlayer.squadStatus === 'baja' && (
-                <div className="col-span-2 grid grid-cols-2 gap-2 bg-rose-950/10 p-3 rounded-xl border border-rose-900/20">
+                <div className="md:col-span-2 grid grid-cols-2 gap-2 bg-rose-950/10 p-3 rounded-xl border border-rose-900/20">
                   <div className="col-span-2 text-rose-400 font-sans text-[10px] font-bold uppercase tracking-wider">
                     📋 Información de la Baja / Venta
                   </div>
@@ -724,7 +883,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                 </div>
               )}
 
-              <div className="col-span-2">
+              <div className="md:col-span-2">
                 <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Notas del Mánager</label>
                 <textarea
                   value={editingPlayer.notes || ''}
@@ -758,19 +917,19 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
         <table className="min-w-full divide-y divide-slate-800 text-left text-xs font-sans">
           <thead className="bg-slate-900/80 text-slate-400 uppercase tracking-wider font-sans font-semibold text-[10px] whitespace-nowrap">
             <tr>
-              {renderSortHeader('id', 'ID Único')}
-              {renderSortHeader('name', 'Nombre')}
-              {renderSortHeader('nationality', 'Nac')}
-              {renderSortHeader('position', 'Pos')}
-              {renderSortHeader('age', 'Edad')}
-              {renderSortHeader('wage', 'Sueldo Anual')}
-              {renderSortHeader('marketValue', 'Valor Mercado')}
-              {renderSortHeader('ca', 'Calidad (CA)')}
-              {renderSortHeader('pa', 'Potencial (PA)')}
-              {renderSortHeader('contractEnd', 'Fin Contrato')}
-              {renderSortHeader('dateOfBirth', 'F. Nacimiento')}
-              {renderSortHeader('squadStatus', 'Estado')}
-              <th className="px-3 py-3 font-semibold text-slate-400 text-right">Acciones</th>
+              {renderSortHeader('id', 'ID Único', 'w-[75px]')}
+              {renderSortHeader('name', 'Nombre', 'w-[160px]')}
+              {renderSortHeader('nationality', 'Nac', 'w-[50px]')}
+              {renderSortHeader('position', 'Pos', 'w-[70px]')}
+              {renderSortHeader('age', 'Edad', 'w-[60px]')}
+              {renderSortHeader('wage', 'Sueldo Anual', 'w-[105px]')}
+              {renderSortHeader('marketValue', 'Valor Mercado', 'w-[105px]')}
+              {renderSortHeader('ca', 'Calidad (CA)', 'w-[110px]')}
+              {renderSortHeader('pa', 'Potencial (PA)', 'w-[110px]')}
+              {renderSortHeader('contractEnd', 'Fin Contrato', 'w-[130px]')}
+              {renderSortHeader('dateOfBirth', 'F. Nacimiento', 'w-[100px]')}
+              {renderSortHeader('squadStatus', 'Estado', 'w-[110px]')}
+              <th className="px-3 py-3 font-semibold text-slate-400 text-right w-[110px]">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">
@@ -822,11 +981,6 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                     <td className="px-3 py-2 font-medium text-slate-100 max-w-[150px] truncate" title={player.name}>
                       <div className="flex items-center gap-1.5">
                         <span className="truncate">{player.name}</span>
-                        {isTurkish && (
-                          <span className="bg-red-950/50 text-red-400 border border-red-500/20 text-[9px] px-1 rounded uppercase font-sans font-bold shrink-0">
-                            🇹🇷 Turco
-                          </span>
-                        )}
                       </div>
                     </td>
                     <td className="px-3 py-2 text-base font-sans" title={player.nationality}>
@@ -841,7 +995,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                         {player.position}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-slate-300 font-sans">{player.age}</td>
+                    <td className="px-3 py-2 text-slate-300 font-sans">{calculateAgeFromDOB(player.dateOfBirth, player.age, gameYear)}</td>
                     <td className="px-3 py-2 text-slate-100 font-sans font-bold whitespace-nowrap text-[11px]" title={`Original: ${player.wage}`}>
                       {parseWageToAnnual(player.wage)}
                     </td>
@@ -852,7 +1006,9 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                     <td className="px-3 py-2 whitespace-nowrap">
                       {renderStarsWithPercentage(player.potentialAbility, player.bestPotRating)}
                     </td>
-                    <td className="px-3 py-2 text-slate-300 font-sans text-[11px] whitespace-nowrap">{player.contractEnd || 'N/A'}</td>
+                    <td className="px-3 py-2 text-slate-300 font-sans text-[11px] whitespace-nowrap">
+                      {calculateContractYearsRemaining(player.contractEnd, gameYear)}
+                    </td>
                     <td className="px-3 py-2 text-slate-400 font-sans text-[11px] whitespace-nowrap">{player.dateOfBirth || 'N/A'}</td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium font-sans
