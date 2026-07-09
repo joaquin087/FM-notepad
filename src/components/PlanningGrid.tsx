@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Player } from '../types';
+import { getFlagEmoji, isTurkishPlayer } from '../utils/flags';
 import { 
   Users, 
   Plus, 
@@ -31,7 +32,8 @@ export const SQUAD_CATEGORIES = [
   { key: 'suplente', label: 'Suplente', textColor: 'text-amber-400', bgColor: 'bg-amber-950/20', borderColor: 'border-amber-500/30', headerColor: 'border-l-4 border-l-amber-500' },
   { key: 'juvenil', label: 'Juvenil', textColor: 'text-cyan-400', bgColor: 'bg-cyan-950/20', borderColor: 'border-cyan-500/30', headerColor: 'border-l-4 border-l-cyan-500' },
   { key: 'recambio', label: 'Recambio', textColor: 'text-slate-200', bgColor: 'bg-slate-900/50', borderColor: 'border-slate-800', headerColor: 'border-l-4 border-l-slate-400' },
-  { key: 'cesion', label: 'Cesión', textColor: 'text-violet-400', bgColor: 'bg-violet-950/20', borderColor: 'border-violet-500/30', headerColor: 'border-l-4 border-l-violet-500' },
+  { key: 'cedidos', label: 'Cedidos', textColor: 'text-violet-400', bgColor: 'bg-violet-950/20', borderColor: 'border-violet-500/30', headerColor: 'border-l-4 border-l-violet-500' },
+  { key: 'aceder', label: 'A ceder', textColor: 'text-purple-400', bgColor: 'bg-purple-950/20', borderColor: 'border-purple-500/30', headerColor: 'border-l-4 border-l-purple-500' },
   { key: 'venta', label: 'Venta', textColor: 'text-rose-400', bgColor: 'bg-rose-950/20', borderColor: 'border-rose-500/30', headerColor: 'border-l-4 border-l-rose-500' },
   { key: 'desarrollo', label: 'Desarrollo', textColor: 'text-blue-400', bgColor: 'bg-blue-950/20', borderColor: 'border-blue-500/30', headerColor: 'border-l-4 border-l-blue-500' },
   { key: 'descartes', label: 'Descartes', textColor: 'text-slate-500', bgColor: 'bg-slate-950/40', borderColor: 'border-slate-900', headerColor: 'border-l-4 border-l-slate-700' },
@@ -95,10 +97,15 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch }: 
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [filterUnassignedOnly, setFilterUnassignedOnly] = useState(true);
 
+  // Active players (excluding those who are Bajas)
+  const activePlayers = useMemo(() => {
+    return players.filter(p => p.squadStatus !== 'baja');
+  }, [players]);
+
   // Group players by assigned position and status for instant O(1) grid queries
   const gridData = useMemo(() => {
     const map: Record<string, Player[]> = {};
-    players.forEach(p => {
+    activePlayers.forEach(p => {
       if (p.squadStatus && p.squadStatus !== 'no_asignado' && p.assignedPosition) {
         const key = `${p.squadStatus}_${p.assignedPosition}`;
         if (!map[key]) map[key] = [];
@@ -106,12 +113,12 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch }: 
       }
     });
     return map;
-  }, [players]);
+  }, [activePlayers]);
 
   // Unassigned players list
   const unassignedPlayers = useMemo(() => {
-    return players.filter(p => !p.assignedPosition || p.squadStatus === 'no_asignado');
-  }, [players]);
+    return activePlayers.filter(p => !p.assignedPosition || p.squadStatus === 'no_asignado');
+  }, [activePlayers]);
 
   // Quick Action: Auto assign all unclassified/unassigned players based on their FM position!
   const handleAutoAlignAll = () => {
@@ -189,7 +196,7 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch }: 
 
   // Filter candidate list for assigning to cell
   const candidates = useMemo(() => {
-    return players.filter(p => {
+    return activePlayers.filter(p => {
       // If we only want unassigned, filter out already assigned players
       if (filterUnassignedOnly && p.assignedPosition && p.squadStatus !== 'no_asignado') {
         return false;
@@ -202,7 +209,7 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch }: 
         p.id.includes(query)
       );
     });
-  }, [players, searchQuery, filterUnassignedOnly]);
+  }, [activePlayers, searchQuery, filterUnassignedOnly]);
 
   return (
     <div className="space-y-6">
@@ -274,7 +281,7 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch }: 
                         <div className="flex flex-col justify-center">
                           <span>{row.label}</span>
                           <span className="text-[9px] text-slate-500 font-mono font-normal">
-                            {players.filter(p => p.squadStatus === row.key).length} jug.
+                            {activePlayers.filter(p => p.squadStatus === row.key).length} jug.
                           </span>
                         </div>
                       </td>
@@ -296,7 +303,9 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch }: 
                                 {cellPlayers.map(p => {
                                   // Determine capability color badge
                                   const ratingColor = p.currentAbility >= 4.5 ? 'text-amber-400' : p.currentAbility >= 3.5 ? 'text-emerald-400' : 'text-slate-400';
-                                  
+                                  const isTurkish = isTurkishPlayer(p.nationality);
+                                  const flag = getFlagEmoji(p.nationality);
+
                                   return (
                                     <div 
                                       key={p.id}
@@ -304,11 +313,16 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch }: 
                                         e.stopPropagation();
                                         setSelectedPlayer(p);
                                       }}
-                                      className="p-1 rounded-lg bg-slate-900 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-850 cursor-pointer transition flex flex-col justify-between shadow-sm relative group/item"
+                                      className={`p-1 rounded-lg border cursor-pointer transition flex flex-col justify-between shadow-sm relative group/item ${
+                                        isTurkish
+                                          ? 'bg-red-950/20 border-red-500/40 shadow-[0_0_6px_rgba(239,68,68,0.2)] hover:border-red-500 hover:bg-red-950/30'
+                                          : 'bg-slate-900 border-slate-800 hover:border-emerald-500/50 hover:bg-slate-850'
+                                      }`}
                                     >
                                       {/* Player Name */}
-                                      <div className="text-[10px] font-bold text-slate-100 truncate pr-2.5 leading-tight" title={p.name}>
-                                        {p.name.split(' ').pop() || p.name}
+                                      <div className="text-[10px] font-bold text-slate-100 truncate pr-2.5 leading-tight flex items-center gap-1" title={`${p.name} (${p.nationality})`}>
+                                        <span className="text-[9px]" title={p.nationality}>{flag}</span>
+                                        <span className="truncate">{p.name.split(' ').pop() || p.name}</span>
                                       </div>
                                       
                                       {/* Ability, Age */}
@@ -363,7 +377,7 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch }: 
               Almacenamiento local activo y sincronizado en tiempo real.
             </span>
             <span className="text-[10px]">
-              Total asignados: <strong className="text-emerald-400">{players.filter(p => p.assignedPosition && p.squadStatus !== 'no_asignado').length}</strong> / {players.length} jugadores
+              Total asignados: <strong className="text-emerald-400">{activePlayers.filter(p => p.assignedPosition && p.squadStatus !== 'no_asignado').length}</strong> / {activePlayers.length} jugadores
             </span>
           </div>
 
@@ -381,14 +395,14 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch }: 
               <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-850">
                 <span className="text-[9px] text-slate-500 block uppercase font-mono">Titulares</span>
                 <span className="text-base font-bold text-emerald-400 font-sans">
-                  {players.filter(p => p.squadStatus === 'titular').length}
+                  {activePlayers.filter(p => p.squadStatus === 'titular').length}
                 </span>
                 <span className="text-[9px] text-slate-500 block">/ 11 de gala</span>
               </div>
               <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-850">
                 <span className="text-[9px] text-slate-500 block uppercase font-mono">Suplentes</span>
                 <span className="text-base font-bold text-amber-400 font-sans">
-                  {players.filter(p => p.squadStatus === 'suplente').length}
+                  {activePlayers.filter(p => p.squadStatus === 'suplente').length}
                 </span>
                 <span className="text-[9px] text-slate-500 block">en el banco</span>
               </div>

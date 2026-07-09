@@ -30,7 +30,14 @@ export default function App() {
   // Global States
   const [players, setPlayers] = useState<Player[]>(() => {
     const saved = localStorage.getItem("fm_players");
-    return saved ? JSON.parse(saved) : defaultPlayers;
+    const rawList: Player[] = saved ? JSON.parse(saved) : defaultPlayers;
+    const seen = new Set<string>();
+    return rawList.filter(p => {
+      if (!p || !p.id) return false;
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
   });
 
   const [assignments, setAssignments] = useState<Record<string, { titular: string | null; suplente: string | null; juvenil: string | null }>>(() => {
@@ -51,6 +58,17 @@ export default function App() {
   const [selectedPosition, setSelectedPosition] = useState<PitchPosition | null>(null);
   const [candidateSearch, setCandidateSearch] = useState('');
   const [showAllCandidates, setShowAllCandidates] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Auto-hide toast after 4 seconds
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => {
+        setToast(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   // Auto-save states in localStorage
   useEffect(() => {
@@ -134,33 +152,96 @@ export default function App() {
     setAssignments(nextAssignments);
   };
 
+  // Helper: Try to auto assign a player to an empty compatible pitch slot
+  const tryAutoAssignToPitch = (player: Player, role: 'titular' | 'suplente' | 'juvenil', currentAssignments: Record<string, { titular: string | null; suplente: string | null; juvenil: string | null }>, formation: Formation) => {
+    const nextAssignments = { ...currentAssignments };
+
+    // 1. Is this player already assigned somewhere on the pitch?
+    let isAlreadyAssigned = false;
+    Object.keys(nextAssignments).forEach(pk => {
+      const slot = nextAssignments[pk];
+      if (slot && (slot.titular === player.id || slot.suplente === player.id || slot.juvenil === player.id)) {
+        isAlreadyAssigned = true;
+      }
+    });
+
+    if (isAlreadyAssigned) return nextAssignments;
+
+    // 2. Determine generic position in matrix
+    const genericPos = player.assignedPosition || getAutoColumn(player.position);
+
+    // 3. Find compatible position key in formation
+    const matchedPosition = formation.positions.find(pos => {
+      const slot = nextAssignments[pos.key];
+      // Skip if slot for this role is already filled
+      if (slot && slot[role]) return false;
+
+      const shortLabelUpper = pos.shortLabel.toUpperCase();
+      const playerPosUpper = player.position.toUpperCase();
+
+      if (genericPos === 'GK' && (pos.key === 'GK' || shortLabelUpper.includes('POR'))) return true;
+      if (genericPos === 'DFCD' && (pos.key === 'DFCR' || shortLabelUpper.includes('DFC D') || shortLabelUpper.includes('DFC C'))) return true;
+      if (genericPos === 'DFCI' && (pos.key === 'DFCL' || shortLabelUpper.includes('DFC I') || shortLabelUpper.includes('DFC C'))) return true;
+      if (genericPos === 'WR' && (pos.key === 'DFR' || pos.key === 'WBR' || shortLabelUpper.includes('DFD') || shortLabelUpper.includes('CR D'))) return true;
+      if (genericPos === 'WL' && (pos.key === 'DFL' || pos.key === 'WBL' || shortLabelUpper.includes('DFI') || shortLabelUpper.includes('CR I'))) return true;
+      if (genericPos === 'DM' && (pos.key === 'DM' || shortLabelUpper.includes('MCD'))) return true;
+      if (genericPos === 'MC' && (pos.key === 'MCR' || pos.key === 'MCL' || pos.key === 'MCC' || shortLabelUpper.includes('MC D') || shortLabelUpper.includes('MC I') || shortLabelUpper.includes('MC C'))) return true;
+      if (genericPos === 'MPC' && (pos.key === 'AMC' || shortLabelUpper.includes('ENG') || shortLabelUpper.includes('MPC') || shortLabelUpper.includes('SD'))) return true;
+      if (genericPos === 'MPI' && (pos.key === 'AML' || pos.key === 'ML' || shortLabelUpper.includes('MP I') || shortLabelUpper.includes('MI'))) return true;
+      if (genericPos === 'MPD' && (pos.key === 'AMR' || pos.key === 'MR' || shortLabelUpper.includes('MP D') || shortLabelUpper.includes('MD'))) return true;
+      if (genericPos === 'DLC' && (pos.key === 'STC' || pos.key === 'STCL' || pos.key === 'STCR' || shortLabelUpper.includes('DL') || shortLabelUpper.includes('DL D') || shortLabelUpper.includes('DL I'))) return true;
+
+      return pos.compatiblePositions.some(comp => playerPosUpper.includes(comp.toUpperCase()));
+    });
+
+    if (matchedPosition) {
+      if (!nextAssignments[matchedPosition.key]) {
+        nextAssignments[matchedPosition.key] = { titular: null, suplente: null, juvenil: null };
+      }
+      nextAssignments[matchedPosition.key][role] = player.id;
+    }
+
+    return nextAssignments;
+  };
+
   // Callback: Update existing player (from table inline editing or custom editing)
   const handleUpdatePlayer = (updatedPlayer: Player) => {
+    let resolvedPlayer = { ...updatedPlayer };
+    if (!resolvedPlayer.assignedPosition) {
+      resolvedPlayer.assignedPosition = getAutoColumn(resolvedPlayer.position);
+    }
+
     const nextAssignments = { ...assignments };
     let assignmentsChanged = false;
 
-    // If their new status is not titular, suplente, or juvenil, remove them from any pitch slot
-    if (updatedPlayer.squadStatus !== 'titular' && updatedPlayer.squadStatus !== 'suplente' && updatedPlayer.squadStatus !== 'juvenil') {
-      Object.keys(nextAssignments).forEach(pk => {
-        const slot = nextAssignments[pk];
-        if (slot) {
-          if (slot.titular === updatedPlayer.id) {
-            slot.titular = null;
-            assignmentsChanged = true;
-          }
-          if (slot.suplente === updatedPlayer.id) {
-            slot.suplente = null;
-            assignmentsChanged = true;
-          }
-          if (slot.juvenil === updatedPlayer.id) {
-            slot.juvenil = null;
-            assignmentsChanged = true;
-          }
+    // 1. Remove from all existing slots first (to avoid duplicates or if their status changed)
+    Object.keys(nextAssignments).forEach(pk => {
+      const slot = nextAssignments[pk];
+      if (slot) {
+        if (slot.titular === resolvedPlayer.id) {
+          slot.titular = null;
+          assignmentsChanged = true;
         }
-      });
+        if (slot.suplente === resolvedPlayer.id) {
+          slot.suplente = null;
+          assignmentsChanged = true;
+        }
+        if (slot.juvenil === resolvedPlayer.id) {
+          slot.juvenil = null;
+          assignmentsChanged = true;
+        }
+      }
+    });
+
+    // 2. If their status is pitch-eligible, try to auto-assign them
+    if (resolvedPlayer.squadStatus === 'titular' || resolvedPlayer.squadStatus === 'suplente' || resolvedPlayer.squadStatus === 'juvenil') {
+      const role = resolvedPlayer.squadStatus;
+      const autoAssigned = tryAutoAssignToPitch(resolvedPlayer, role, nextAssignments, activeFormation);
+      Object.assign(nextAssignments, autoAssigned);
+      assignmentsChanged = true;
     }
 
-    setPlayers(prevPlayers => prevPlayers.map(p => p.id === updatedPlayer.id ? updatedPlayer : p));
+    setPlayers(prevPlayers => prevPlayers.map(p => p.id === resolvedPlayer.id ? resolvedPlayer : p));
     if (assignmentsChanged) {
       setAssignments(nextAssignments);
     }
@@ -168,7 +249,25 @@ export default function App() {
 
   // Callback: Register brand new player
   const handleAddPlayer = (newPlayer: Player) => {
-    setPlayers(prev => [newPlayer, ...prev]);
+    let resolvedPlayer = { ...newPlayer };
+    if (!resolvedPlayer.assignedPosition) {
+      resolvedPlayer.assignedPosition = getAutoColumn(resolvedPlayer.position);
+    }
+
+    const nextAssignments = { ...assignments };
+    let assignmentsChanged = false;
+
+    if (resolvedPlayer.squadStatus === 'titular' || resolvedPlayer.squadStatus === 'suplente' || resolvedPlayer.squadStatus === 'juvenil') {
+      const role = resolvedPlayer.squadStatus;
+      const autoAssigned = tryAutoAssignToPitch(resolvedPlayer, role, nextAssignments, activeFormation);
+      Object.assign(nextAssignments, autoAssigned);
+      assignmentsChanged = true;
+    }
+
+    setPlayers(prev => [resolvedPlayer, ...prev]);
+    if (assignmentsChanged) {
+      setAssignments(nextAssignments);
+    }
   };
 
   // Callback: Delete player from roster
@@ -215,7 +314,7 @@ export default function App() {
           if (mergedStatus === 'no_asignado' && p.squadStatus !== 'no_asignado') {
             mergedStatus = p.squadStatus;
           } else if (mergedStatus as string === 'cedido') {
-            mergedStatus = 'cesion';
+            mergedStatus = 'cedidos';
           } else if (mergedStatus as string === 'vender') {
             mergedStatus = 'venta';
           }
@@ -231,7 +330,7 @@ export default function App() {
           if (status === 'no_asignado') {
             status = 'recambio';
           } else if (status as string === 'cedido') {
-            status = 'cesion';
+            status = 'cedidos';
           } else if (status as string === 'vender') {
             status = 'venta';
           }
@@ -245,17 +344,31 @@ export default function App() {
         }
       });
 
+      // Deduplicate processedNew within itself
+      const seenIds = new Set<string>();
+      const deduplicatedNew = processedNew.filter(p => {
+        if (!p || !p.id) return false;
+        if (seenIds.has(p.id)) return false;
+        seenIds.add(p.id);
+        return true;
+      });
+
       if (mode === 'replace') {
-        return processedNew;
+        return deduplicatedNew;
       } else {
         const existingIds = new Set(prev.map(x => x.id));
-        const filteredNew = processedNew.filter(x => !existingIds.has(x.id));
+        const filteredNew = deduplicatedNew.filter(x => !existingIds.has(x.id));
         return [...filteredNew, ...prev];
       }
     });
   };
 
   // Reset entirely to standard default 110 database
+  const handleDeleteAllPlayers = () => {
+    setPlayers([]);
+    setAssignments({});
+  };
+
   const handleResetToDefaults = () => {
     setPlayers(defaultPlayers);
     setAssignments({});
@@ -350,12 +463,12 @@ export default function App() {
           } else {
             setSnapshots([]);
           }
-          alert("¡Copia de seguridad importada con éxito!");
+          setToast({ message: "¡Copia de seguridad importada con éxito!", type: 'success' });
         } else {
-          alert("El archivo JSON seleccionado no tiene un formato válido.");
+          setToast({ message: "El archivo JSON no tiene un formato válido.", type: 'error' });
         }
       } catch (err) {
-        alert("Error al leer el archivo JSON.");
+        setToast({ message: "Error al leer el archivo JSON.", type: 'error' });
       }
     };
     fileReader.readAsText(file);
@@ -451,7 +564,7 @@ export default function App() {
 
       {/* Primary Navigation Tabs */}
       <nav className="bg-slate-900/60 border-b border-slate-850 sticky top-0 z-40 backdrop-blur">
-        <div className="max-w-7xl mx-auto px-4 flex justify-between items-center overflow-x-auto">
+        <div className="max-w-[95%] w-[95%] mx-auto px-4 flex justify-between items-center overflow-x-auto">
           <div className="flex space-x-1 py-1.5 scrollbar-none">
             <button
               onClick={() => setActiveTab('planning_grid')}
@@ -547,7 +660,7 @@ export default function App() {
       </nav>
 
       {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 py-5 font-sans">
+      <main className="max-w-[95%] w-[95%] mx-auto px-4 py-5 font-sans">
         
         {/* TAB 0: DETAILED PLANNING GRID MATRIX */}
         {activeTab === 'planning_grid' && (
@@ -845,6 +958,7 @@ export default function App() {
             onAddPlayer={handleAddPlayer}
             onDeletePlayer={handleDeletePlayer}
             onResetToDefaults={handleResetToDefaults}
+            onDeleteAllPlayers={handleDeleteAllPlayers}
           />
         )}
 
@@ -987,6 +1101,33 @@ export default function App() {
           <p className="text-[10px]">Diseñado para mánagers profesionales de simulación de fútbol. Datos almacenados de forma segura en tu navegador de manera persistente.</p>
         </div>
       </footer>
+
+      {/* Floating Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-5 right-5 z-50 max-w-sm bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-4 flex items-start gap-3 animate-fade-in transition-all">
+          {toast.type === 'success' ? (
+            <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-1.5 rounded-lg shrink-0">
+              <Check className="w-4 h-4" />
+            </div>
+          ) : (
+            <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-1.5 rounded-lg shrink-0">
+              <AlertCircle className="w-4 h-4" />
+            </div>
+          )}
+          <div className="flex-1 space-y-1">
+            <p className="text-xs font-bold text-white font-sans">
+              {toast.type === 'success' ? 'Operación Exitosa' : 'Aviso / Error'}
+            </p>
+            <p className="text-[11px] text-slate-300 font-sans leading-relaxed">{toast.message}</p>
+          </div>
+          <button 
+            onClick={() => setToast(null)}
+            className="text-slate-500 hover:text-slate-300 transition-colors shrink-0 p-0.5"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
     </div>
   );

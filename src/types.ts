@@ -8,9 +8,26 @@ export interface Player {
   potentialAbility: number; // 1 to 5 stars
   marketValue: string; // e.g., "€12M"
   wage: string; // e.g., "€45K/semana"
-  squadStatus: 'titular' | 'suplente' | 'juvenil' | 'recambio' | 'cesion' | 'venta' | 'desarrollo' | 'descartes' | 'no_asignado';
+  squadStatus: 'titular' | 'suplente' | 'juvenil' | 'recambio' | 'cedidos' | 'aceder' | 'venta' | 'desarrollo' | 'descartes' | 'no_asignado' | 'baja';
   assignedPosition?: string; // Column mapped on the tactical matrix grid (e.g. "GK", "DFCD", etc.)
   notes?: string;
+  
+  // New columns from Football Manager
+  club?: string;
+  saleValue?: string;
+  bestRating?: string; // Star rating or percentage e.g. "87.9%"
+  bestPotRating?: string; // Potential rating or percentage e.g. "93.2%"
+  contractEnd?: string;
+  dateOfBirth?: string;
+  clubId?: string;
+  intCaps?: number;
+  intGoals?: number;
+
+  // Bajas fields
+  fechaBaja?: string; // Year only
+  montoBaja?: string;
+  clubBaja?: string;
+  comentarioBaja?: string;
 }
 
 export interface Snapshot {

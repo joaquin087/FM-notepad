@@ -56,13 +56,23 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount }: Clip
         let potentialAbility = 3;
         let marketValue = "";
         let wage = "";
+        
+        let club = "";
+        let saleValue = "";
+        let bestRating = "";
+        let bestPotRating = "";
+        let contractEnd = "";
+        let dateOfBirth = "";
+        let clubId = "";
+        let intCaps = 0;
+        let intGoals = 0;
 
         if (hasHeaders) {
           headers.forEach((header, colIndex) => {
             const val = cells[colIndex];
             if (!val) return;
 
-            if (header.includes("id") || header === "pk") {
+            if (header.includes("id") || header === "pk" || header === "id único" || header === "uid") {
               id = val;
             } else if (header.includes("nombre") || header.includes("name") || header === "nom") {
               name = val;
@@ -71,12 +81,39 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount }: Clip
               if (!isNaN(parsedAge)) age = parsedAge;
             } else if (header.includes("pos") || header === "puesto") {
               position = val;
-            } else if (header.includes("nacionalidad") || header.includes("nac") || header.includes("nat")) {
+            } else if (header.includes("nacionalidad") || header.includes("nac") || header.includes("nat") || header.includes("país") || header.includes("nation")) {
               nationality = val;
             } else if (header.includes("valor") || header.includes("value") || header === "val") {
               marketValue = val;
             } else if (header.includes("sueldo") || header.includes("wage") || header.includes("sal") || header.includes("contrato")) {
               wage = val;
+            } else if (header.includes("club")) {
+              club = val;
+            } else if (header.includes("sale value") || header.includes("valor de venta") || header.includes("salevalue")) {
+              saleValue = val;
+            } else if (header.includes("best rating") || header.includes("mejor cal") || header.includes("bestrating") || header.includes("calidad actual %") || header.includes("calidad de juego")) {
+              bestRating = val;
+              // If we have a percentage, let's estimate the stars
+              const parsedPct = parseFloat(val);
+              if (!isNaN(parsedPct) && parsedPct <= 100) {
+                currentAbility = Math.max(1, Math.min(5, Math.round((parsedPct / 100) * 5)));
+              }
+            } else if (header.includes("best pot rating") || header.includes("mejor pot") || header.includes("bestpotrating") || header.includes("calidad potencial %")) {
+              bestPotRating = val;
+              const parsedPct = parseFloat(val);
+              if (!isNaN(parsedPct) && parsedPct <= 100) {
+                potentialAbility = Math.max(1, Math.min(5, Math.round((parsedPct / 100) * 5)));
+              }
+            } else if (header.includes("contract end") || header.includes("fin contr") || header.includes("contractend") || header.includes("vence")) {
+              contractEnd = val;
+            } else if (header.includes("date of birth") || header.includes("fecha nac") || header.includes("dob") || header.includes("nacimiento")) {
+              dateOfBirth = val;
+            } else if (header.includes("club id") || header.includes("clubid")) {
+              clubId = val;
+            } else if (header.includes("int caps") || header.includes("partidos int") || header.includes("intcaps")) {
+              intCaps = parseInt(val) || 0;
+            } else if (header.includes("int goals") || header.includes("goles int") || header.includes("intgoals")) {
+              intGoals = parseInt(val) || 0;
             } else if (header.includes("ca") || header.includes("calidad actual") || header.includes("ability") || header.includes("cur")) {
               // Convert stars or scale
               if (val.includes("*")) {
@@ -157,7 +194,17 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount }: Clip
           marketValue,
           wage,
           squadStatus: "no_asignado",
-          notes: "Importado desde planilla Football Manager"
+          notes: "Importado desde planilla Football Manager",
+          
+          club,
+          saleValue,
+          bestRating,
+          bestPotRating,
+          contractEnd,
+          dateOfBirth,
+          clubId,
+          intCaps,
+          intGoals
         });
       }
 
