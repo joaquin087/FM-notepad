@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Player } from '../types';
-import { getFlagEmoji, isTurkishPlayer, formatRatingWithPercentage, getPlayerFlags, calculateAgeFromDOB, calculateContractYearsRemaining } from '../utils/flags';
+import { getFlagEmoji, isTurkishPlayer, formatRatingWithPercentage, getPlayerFlags, calculateAgeFromDOB, calculateContractYearsRemaining, calculateAgeFromDOBPrecise, calculateContractYearsRemainingPrecise } from '../utils/flags';
 import { Search, Filter, Plus, Trash2, Edit3, Check, X, Star, AlertCircle, RefreshCw, Trash } from 'lucide-react';
 
 interface RosterManagerProps {
@@ -11,9 +11,10 @@ interface RosterManagerProps {
   onResetToDefaults: () => void;
   onDeleteAllPlayers: () => void;
   gameYear: number;
+  gameDate: string;
 }
 
-export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePlayer, onResetToDefaults, onDeleteAllPlayers, gameYear }: RosterManagerProps) {
+export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePlayer, onResetToDefaults, onDeleteAllPlayers, gameYear, gameDate }: RosterManagerProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [positionFilter, setPositionFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -66,28 +67,51 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
     const clean = valStr.trim();
     if (!clean) return { stars: 2, rawRating: '' };
     
-    // If it contains percentage
-    if (clean.includes('%')) {
-      const parsedPct = parseFloat(clean);
-      if (!isNaN(parsedPct)) {
-        const stars = Math.max(1, Math.min(5, Math.round((parsedPct / 100) * 5)));
-        return { stars, rawRating: clean };
-      }
-    }
-
-    const num = parseInt(clean);
+    // Replace % for parsing if present
+    const cleanNumStr = clean.replace('%', '').replace(',', '.');
+    const num = parseFloat(cleanNumStr);
     if (isNaN(num)) {
       return { stars: 2, rawRating: '' };
     }
 
-    if (num > 5) {
-      // scale 1-200
-      const stars = Math.max(1, Math.min(5, Math.round((num / 200) * 5)));
-      return { stars, rawRating: String(num) };
+    if (num <= 5) {
+      // Direct star rating input, e.g. 4.5
+      const pct = num * 20;
+      return { stars: num, rawRating: `${pct.toFixed(0)}%` };
+    } else if (num <= 100) {
+      // convert to 0-5 stars with 0.5 increments
+      const stars = Math.max(0, Math.min(5, Math.round((num / 100) * 10) / 2));
+      const formattedPct = clean.includes('%') ? clean : `${num}%`;
+      return { stars, rawRating: formattedPct };
     } else {
-      // stars (1-5)
-      return { stars: Math.max(1, Math.min(5, num)), rawRating: String(num) };
+      // scale 1-200
+      const stars = Math.max(0, Math.min(5, Math.round((num / 200) * 10) / 2));
+      const pct = (num / 200) * 100;
+      return { stars, rawRating: `${pct.toFixed(0)}%` };
     }
+  };
+
+  // Helper to get uniform percentage value for any rating format (stars, 1-200, or percentage)
+  const getPercentageValue = (stars: number, customRating?: string): number => {
+    if (!customRating) return stars * 20;
+    const clean = customRating.trim();
+    
+    // Look for percentage inside parentheses first, e.g. "3.5 (87.9%)" -> "87.9%"
+    const match = clean.match(/\(([^%)]+%)?\)/) || clean.match(/\(([^)]+)\)/);
+    const contentToParse = match ? match[1] : clean;
+    
+    if (contentToParse.includes('%')) {
+      const parsed = parseFloat(contentToParse.replace('%', '').trim().replace(',', '.'));
+      if (!isNaN(parsed)) return parsed;
+    }
+    
+    const num = parseFloat(contentToParse.replace(',', '.'));
+    if (!isNaN(num)) {
+      if (num <= 5) return num * 20; // 1-5 star scale
+      if (num <= 100) return num; // Already 0-100 percentage
+      return (num / 200) * 100; // 1-200 scale
+    }
+    return stars * 20;
   };
 
   // New player temporary state
@@ -109,8 +133,8 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
     bestPotRating: ''
   });
 
-  const [newCaInput, setNewCaInput] = useState('120');
-  const [newPaInput, setNewPaInput] = useState('160');
+  const [newCaInput, setNewCaInput] = useState('60%');
+  const [newPaInput, setNewPaInput] = useState('80%');
   const [customId, setCustomId] = useState('');
   const [contractEndInput, setContractEndInput] = useState('30/6/2028');
   const [dateOfBirthInput, setDateOfBirthInput] = useState('18/12/2001');
@@ -136,8 +160,9 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
   };
 
   // Filter players
-  const activeRosterPlayers = players.filter(p => p.squadStatus !== 'baja');
+  const activeRosterPlayers = players.filter(p => p.squadStatus !== 'baja' && p.squadStatus !== 'cedidos');
   const bajasPlayers = players.filter(p => p.squadStatus === 'baja');
+  const cedidosPlayers = players.filter(p => p.squadStatus === 'cedidos');
 
   const filteredPlayers = activeRosterPlayers.filter(player => {
     const matchesSearch = player.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -198,12 +223,12 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
         valB = parseMarketValueToNumeric(b.marketValue);
         break;
       case 'ca':
-        valA = a.currentAbility;
-        valB = b.currentAbility;
+        valA = getPercentageValue(a.currentAbility, a.bestRating);
+        valB = getPercentageValue(b.currentAbility, b.bestRating);
         break;
       case 'pa':
-        valA = a.potentialAbility;
-        valB = b.potentialAbility;
+        valA = getPercentageValue(a.potentialAbility, a.bestPotRating);
+        valB = getPercentageValue(b.potentialAbility, b.bestPotRating);
         break;
       case 'contractEnd':
         valA = (a.contractEnd || '').toLowerCase();
@@ -228,8 +253,8 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
 
   const handleEditClick = (player: Player) => {
     setEditingPlayer({ ...player });
-    setEditCaInput(player.bestRating || String(player.currentAbility * 40));
-    setEditPaInput(player.bestPotRating || String(player.potentialAbility * 40));
+    setEditCaInput(player.bestRating || `${(player.currentAbility * 20).toFixed(0)}%`);
+    setEditPaInput(player.bestPotRating || `${(player.potentialAbility * 20).toFixed(0)}%`);
     setFormError('');
   };
 
@@ -297,8 +322,8 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
       bestRating: '',
       bestPotRating: ''
     });
-    setNewCaInput('120');
-    setNewPaInput('160');
+    setNewCaInput('60%');
+    setNewPaInput('80%');
     setCustomId('');
     setContractEndInput('30/6/2028');
     setDateOfBirthInput('18/12/2001');
@@ -622,27 +647,27 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
             <div>
               <label className="text-[10px] text-slate-400 flex justify-between">
                 <span>Calidad Actual (CA)</span>
-                <span className="text-slate-500 font-mono">1-200 o stars</span>
+                <span className="text-slate-500 font-mono">0% - 100%</span>
               </label>
               <input
                 type="text"
-                placeholder="Ej. 135"
+                placeholder="Ej. 75%"
                 value={newCaInput}
                 onChange={(e) => setNewCaInput(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-850 rounded p-1.5 text-slate-100 font-mono"
+                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 font-mono"
               />
             </div>
             <div>
               <label className="text-[10px] text-slate-400 flex justify-between">
                 <span>Potencial (PA)</span>
-                <span className="text-slate-500 font-mono">1-200 o stars</span>
+                <span className="text-slate-500 font-mono">0% - 100%</span>
               </label>
               <input
                 type="text"
-                placeholder="Ej. 160"
+                placeholder="Ej. 90%"
                 value={newPaInput}
                 onChange={(e) => setNewPaInput(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-850 rounded p-1.5 text-slate-100 font-mono"
+                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 font-mono"
               />
             </div>
           </div>
@@ -791,7 +816,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
               <div>
                 <label className="text-[10px] uppercase font-bold text-slate-400 font-sans flex justify-between">
                   <span>Calidad Actual (CA)</span>
-                  <span className="text-slate-500 font-mono">1-200 o stars</span>
+                  <span className="text-slate-500 font-mono">0% - 100%</span>
                 </label>
                 <input
                   type="text"
@@ -804,7 +829,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
               <div>
                 <label className="text-[10px] uppercase font-bold text-slate-400 font-sans flex justify-between">
                   <span>Calidad Potencial (PA)</span>
-                  <span className="text-slate-500 font-mono">1-200 o stars</span>
+                  <span className="text-slate-500 font-mono">0% - 100%</span>
                 </label>
                 <input
                   type="text"
@@ -883,6 +908,44 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                 </div>
               )}
 
+              {editingPlayer.squadStatus === 'cedidos' && (
+                <div className="md:col-span-2 grid grid-cols-2 gap-2 bg-blue-950/20 p-3 rounded-xl border border-blue-900/30">
+                  <div className="col-span-2 text-blue-400 font-sans text-[10px] font-bold uppercase tracking-wider">
+                    ✈️ Información de la Cesión / Préstamo
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-[10px] text-slate-400">Club Destino de Préstamo</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Galatasaray"
+                      value={editingPlayer.clubPrestamo || ''}
+                      onChange={(e) => setEditingPlayer({ ...editingPlayer, clubPrestamo: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 mt-1 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400">Año fin de Préstamo</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. 2027"
+                      value={editingPlayer.finPrestamo || ''}
+                      onChange={(e) => setEditingPlayer({ ...editingPlayer, finPrestamo: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 mt-1 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400">Opción de Compra</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. €5M (No obligatoria)"
+                      value={editingPlayer.opcionCompra || ''}
+                      onChange={(e) => setEditingPlayer({ ...editingPlayer, opcionCompra: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 mt-1 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="md:col-span-2">
                 <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Notas del Mánager</label>
                 <textarea
@@ -917,25 +980,24 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
         <table className="min-w-full divide-y divide-slate-800 text-left text-xs font-sans">
           <thead className="bg-slate-900/80 text-slate-400 uppercase tracking-wider font-sans font-semibold text-[10px] whitespace-nowrap">
             <tr>
-              {renderSortHeader('id', 'ID Único', 'w-[75px]')}
               {renderSortHeader('name', 'Nombre', 'w-[160px]')}
               {renderSortHeader('nationality', 'Nac', 'w-[50px]')}
               {renderSortHeader('position', 'Pos', 'w-[70px]')}
-              {renderSortHeader('age', 'Edad', 'w-[60px]')}
+              {renderSortHeader('age', 'Edad (F. Nacimiento)', 'w-[150px]')}
               {renderSortHeader('wage', 'Sueldo Anual', 'w-[105px]')}
               {renderSortHeader('marketValue', 'Valor Mercado', 'w-[105px]')}
               {renderSortHeader('ca', 'Calidad (CA)', 'w-[110px]')}
               {renderSortHeader('pa', 'Potencial (PA)', 'w-[110px]')}
               {renderSortHeader('contractEnd', 'Fin Contrato', 'w-[130px]')}
-              {renderSortHeader('dateOfBirth', 'F. Nacimiento', 'w-[100px]')}
               {renderSortHeader('squadStatus', 'Estado', 'w-[110px]')}
               <th className="px-3 py-3 font-semibold text-slate-400 text-right w-[110px]">Acciones</th>
+              {renderSortHeader('id', 'ID Único', 'w-[75px] text-right')}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">
             {sortedPlayers.length === 0 ? (
               <tr>
-                <td colSpan={13} className="px-4 py-8 text-center text-slate-500 italic">
+                <td colSpan={12} className="px-4 py-8 text-center text-slate-500 italic">
                   Ningún jugador coincide con los filtros de búsqueda.
                 </td>
               </tr>
@@ -968,6 +1030,9 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                   }
                 };
 
+                const preciseAge = calculateAgeFromDOBPrecise(player.dateOfBirth, player.age, gameDate);
+                const dobStr = player.dateOfBirth ? `(${player.dateOfBirth})` : '';
+
                 return (
                   <tr 
                     key={player.id} 
@@ -977,7 +1042,6 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                         : ''
                     }`}
                   >
-                    <td className="px-3 py-2 text-slate-500 font-sans font-medium text-[10px]">{player.id}</td>
                     <td className="px-3 py-2 font-medium text-slate-100 max-w-[150px] truncate" title={player.name}>
                       <div className="flex items-center gap-1.5">
                         <span className="truncate">{player.name}</span>
@@ -995,7 +1059,9 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                         {player.position}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-slate-300 font-sans">{calculateAgeFromDOB(player.dateOfBirth, player.age, gameYear)}</td>
+                    <td className="px-3 py-2 text-slate-300 font-sans whitespace-nowrap">
+                      {preciseAge} <span className="text-[10px] text-slate-500 font-normal ml-1">{dobStr}</span>
+                    </td>
                     <td className="px-3 py-2 text-slate-100 font-sans font-bold whitespace-nowrap text-[11px]" title={`Original: ${player.wage}`}>
                       {parseWageToAnnual(player.wage)}
                     </td>
@@ -1007,9 +1073,8 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                       {renderStarsWithPercentage(player.potentialAbility, player.bestPotRating)}
                     </td>
                     <td className="px-3 py-2 text-slate-300 font-sans text-[11px] whitespace-nowrap">
-                      {calculateContractYearsRemaining(player.contractEnd, gameYear)}
+                      {calculateContractYearsRemainingPrecise(player.contractEnd, gameDate)}
                     </td>
-                    <td className="px-3 py-2 text-slate-400 font-sans text-[11px] whitespace-nowrap">{player.dateOfBirth || 'N/A'}</td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium font-sans
                         ${player.squadStatus === 'titular' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : ''}
@@ -1109,12 +1174,141 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                         )}
                       </div>
                     </td>
+                    <td className="px-3 py-2 text-slate-500 font-sans font-medium text-[10px] text-right">{player.id}</td>
                   </tr>
                 );
               })
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* SECCIÓN DE JUGADORES CEDIDOS (PRÉSTAMOS) */}
+      <div className="bg-slate-950 p-5 rounded-2xl border border-blue-950/40 space-y-4 mt-6">
+        <div className="border-b border-slate-800 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-bold text-blue-400 uppercase tracking-wider font-sans flex items-center gap-2">
+              ✈️ SECCIÓN DE JUGADORES CEDIDOS ({cedidosPlayers.length} jugadores)
+            </h3>
+            <p className="text-xs text-slate-400">
+              Jugadores prestados a otros equipos que no forman parte del plantel actual, con club de destino, vencimiento y opción de compra.
+            </p>
+          </div>
+        </div>
+
+        {cedidosPlayers.length === 0 ? (
+          <div className="p-8 text-center text-xs text-slate-500 italic bg-slate-900/10 rounded-xl border border-dashed border-slate-800/60">
+            No tienes jugadores cedidos registrados actualmente.
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/20">
+            <table className="min-w-full divide-y divide-slate-800 text-left text-xs font-sans">
+              <thead className="bg-slate-900/50 text-slate-400 uppercase font-sans font-semibold text-[10px] whitespace-nowrap">
+                <tr>
+                  <th className="px-3 py-2.5 font-semibold">ID</th>
+                  <th className="px-3 py-2.5 font-semibold">Jugador</th>
+                  <th className="px-3 py-2.5 font-semibold">Nacionalidad</th>
+                  <th className="px-3 py-2.5 font-semibold">Club Destino de Préstamo</th>
+                  <th className="px-3 py-2.5 font-semibold">Fin de Préstamo (Año)</th>
+                  <th className="px-3 py-2.5 font-semibold">Opción de Compra</th>
+                  <th className="px-3 py-2.5 font-semibold text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/40">
+                {cedidosPlayers.map((p) => (
+                  <tr key={p.id} className="hover:bg-blue-950/10 transition-colors">
+                    <td className="px-3 py-2 text-slate-500 font-sans font-medium text-[10px]">{p.id}</td>
+                    <td className="px-3 py-2">
+                      <div className="font-bold text-slate-100">{p.name}</div>
+                      <div className="text-[10px] text-slate-500 font-sans">{p.position} • {p.age} años</div>
+                    </td>
+                    <td className="px-3 py-2 text-slate-300">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-base">{getFlagEmoji(p.nationality)}</span>
+                        <span>{p.nationality}</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="text"
+                        placeholder="Ej. Galatasaray"
+                        value={p.clubPrestamo || ''}
+                        onChange={(e) => onUpdatePlayer({ ...p, clubPrestamo: e.target.value })}
+                        className="bg-slate-950 border border-slate-850 rounded px-2 py-1 text-xs text-slate-100 w-36 focus:border-blue-500 focus:outline-none"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="text"
+                        placeholder="Ej. 2027"
+                        value={p.finPrestamo || ''}
+                        onChange={(e) => onUpdatePlayer({ ...p, finPrestamo: e.target.value })}
+                        className="bg-slate-950 border border-slate-850 rounded px-2 py-1 text-xs text-slate-100 w-20 text-center focus:border-blue-500 focus:outline-none"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="text"
+                        placeholder="Ej. €5M"
+                        value={p.opcionCompra || ''}
+                        onChange={(e) => onUpdatePlayer({ ...p, opcionCompra: e.target.value })}
+                        className="bg-slate-950 border border-slate-850 rounded px-2 py-1 text-xs text-slate-100 w-36 focus:border-blue-500 focus:outline-none"
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <div className="flex justify-end gap-1.5">
+                        <button
+                          onClick={() => {
+                            onUpdatePlayer({
+                              ...p,
+                              squadStatus: 'no_asignado',
+                              clubPrestamo: undefined,
+                              finPrestamo: undefined,
+                              opcionCompra: undefined
+                            });
+                          }}
+                          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded text-[10px] transition"
+                        >
+                          Reincorporar
+                        </button>
+                        {confirmDeleteId === p.id ? (
+                          <div className="flex items-center gap-1 bg-rose-950 border border-rose-500/30 p-1 rounded">
+                            <span className="text-[9px] font-bold text-rose-300 font-sans">¿Eliminar?</span>
+                            <button
+                              onClick={() => {
+                                onDeletePlayer(p.id);
+                                setConfirmDeleteId(null);
+                              }}
+                              className="bg-rose-600 hover:bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded font-bold transition font-sans"
+                            >
+                              Sí
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteId(null)}
+                              className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[9px] px-1.5 py-0.5 rounded font-medium transition font-sans"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setConfirmDeleteId(p.id);
+                            }}
+                            className="p-1 bg-rose-950/40 hover:bg-rose-900 text-rose-400 border border-rose-900/20 rounded transition"
+                            title="Eliminar permanentemente"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* SECCIÓN DE BAJAS Y SALIDAS */}

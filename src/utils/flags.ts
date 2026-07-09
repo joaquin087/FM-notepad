@@ -110,7 +110,45 @@ export const formatRatingWithPercentage = (starsCount: number, customRating?: st
   return `${"★".repeat(starsCount)}${"☆".repeat(5 - starsCount)} (${pct})`;
 };
 
-// Helper to calculate age based on Date of Birth and the current game year
+// Helper to calculate age based on Date of Birth and the exact current game date (fallback to year subtraction if date format mismatch)
+export const calculateAgeFromDOBPrecise = (dob: string | undefined, fallbackAge: number, gameDate: string): number => {
+  if (!dob || dob === 'N/A' || dob === 'N/D') return fallbackAge;
+  
+  const parseDate = (dStr: string): Date | null => {
+    const clean = dStr.trim();
+    const parts = clean.split(/[\.\-\/]+/);
+    if (parts.length === 3) {
+      let d = parseInt(parts[0]);
+      let m = parseInt(parts[1]) - 1; // 0-indexed
+      let y = parseInt(parts[2]);
+      if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
+      if (y < 100) y += 2000;
+      return new Date(y, m, d);
+    } else if (/^\d{4}$/.test(clean)) {
+      return new Date(parseInt(clean), 0, 1);
+    }
+    return null;
+  };
+
+  const dobDate = parseDate(dob);
+  const currentDate = parseDate(gameDate);
+
+  if (dobDate && currentDate) {
+    let ageDiff = currentDate.getFullYear() - dobDate.getFullYear();
+    const monthDiff = currentDate.getMonth() - dobDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && currentDate.getDate() < dobDate.getDate())) {
+      ageDiff--;
+    }
+    return ageDiff;
+  }
+  
+  // Year fallback if precise parse failed
+  const partsGame = gameDate.split(/[\.\-\/]+/);
+  const yearGame = partsGame.length === 3 ? parseInt(partsGame[2]) : parseInt(gameDate) || 2036;
+  return calculateAgeFromDOB(dob, fallbackAge, yearGame);
+};
+
+// Helper to calculate age based on Date of Birth and the current game year (as fallback)
 export const calculateAgeFromDOB = (dob: string | undefined, fallbackAge: number, gameYear: number): number => {
   if (!dob || dob === 'N/A' || dob === 'N/D') return fallbackAge;
   const clean = dob.trim();
@@ -122,7 +160,6 @@ export const calculateAgeFromDOB = (dob: string | undefined, fallbackAge: number
   }
   const parts = clean.split(/[\.\-\/]+/);
   if (parts.length === 3) {
-    // Check if the 3rd part or the 1st part is the 4-digit year
     let year = parseInt(parts[2]);
     if (isNaN(year) || year < 100) {
       year = parseInt(parts[0]);
@@ -134,7 +171,56 @@ export const calculateAgeFromDOB = (dob: string | undefined, fallbackAge: number
   return fallbackAge;
 };
 
-// Helper to calculate years remaining on a contract relative to the current game year
+// Helper to calculate years or months remaining on a contract relative to the exact game date
+export const calculateContractYearsRemainingPrecise = (contractEnd: string | undefined, gameDate: string): string => {
+  if (!contractEnd || contractEnd === 'N/A' || contractEnd === 'N/D') return "N/D";
+  
+  const parseDate = (dStr: string): Date | null => {
+    const clean = dStr.trim();
+    const parts = clean.split(/[\.\-\/]+/);
+    if (parts.length === 3) {
+      let d = parseInt(parts[0]);
+      let m = parseInt(parts[1]) - 1; // 0-indexed
+      let y = parseInt(parts[2]);
+      if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
+      if (y < 100) y += 2000;
+      return new Date(y, m, d);
+    } else if (/^\d{4}$/.test(clean)) {
+      return new Date(parseInt(clean), 5, 30); // Default to June 30th of that year
+    }
+    return null;
+  };
+
+  const dateCurrent = parseDate(gameDate);
+  const dateEnd = parseDate(contractEnd);
+
+  if (dateCurrent && dateEnd) {
+    const diffTime = dateEnd.getTime() - dateCurrent.getTime();
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    
+    if (diffDays <= 0) {
+      return `Terminado / Vencido (${contractEnd})`;
+    }
+    
+    const years = diffDays / 365.25;
+    if (years < 1) {
+      const months = Math.round(diffDays / 30.4375);
+      if (months <= 1) {
+        return `1 mes (${contractEnd})`;
+      }
+      return `${months} meses (${contractEnd})`;
+    } else {
+      return `${years.toFixed(1)} ${years.toFixed(1) === '1.0' ? 'año' : 'años'} (${contractEnd})`;
+    }
+  }
+
+  // Fallback to simple year math
+  const partsGame = gameDate.split(/[\.\-\/]+/);
+  const yearGame = partsGame.length === 3 ? parseInt(partsGame[2]) : parseInt(gameDate) || 2036;
+  return calculateContractYearsRemaining(contractEnd, yearGame);
+};
+
+// Helper to calculate years remaining on a contract relative to the current game year (as fallback)
 export const calculateContractYearsRemaining = (contractEnd: string | undefined, gameYear: number): string => {
   if (!contractEnd || contractEnd === 'N/A' || contractEnd === 'N/D') return "N/D";
   const clean = contractEnd.trim();

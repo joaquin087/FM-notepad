@@ -5,9 +5,53 @@ import { Upload, HelpCircle, CheckCircle, AlertCircle, Sparkles } from 'lucide-r
 interface ClipboardImporterProps {
   onImportPlayers: (newPlayers: Player[], mode: 'replace' | 'append') => void;
   currentPlayersCount: number;
+  gameDate: string;
+  onChangeGameDate: (date: string) => void;
 }
 
-export function ClipboardImporter({ onImportPlayers, currentPlayersCount }: ClipboardImporterProps) {
+const parseImportedRating = (valStr: string): { stars: number; raw: string } => {
+  const clean = valStr.trim();
+  if (!clean) return { stars: 2, raw: "" };
+
+  // 1. Try to see if there is a percentage inside parentheses, e.g. "3.5 (87.9%)"
+  const matchPctInParens = clean.match(/\(([^%)]+%)?\)/) || clean.match(/\(([^)]+)\)/);
+  if (matchPctInParens) {
+    const inside = matchPctInParens[1].replace('%', '').trim().replace(',', '.');
+    const parsedPct = parseFloat(inside);
+    if (!isNaN(parsedPct)) {
+      const stars = Math.max(0, Math.min(5, Math.round((parsedPct / 100) * 10) / 2));
+      return { stars, raw: clean };
+    }
+  }
+
+  // 2. Try to see if the whole string is a percentage, e.g. "87.9%"
+  if (clean.includes('%')) {
+    const parsedPct = parseFloat(clean.replace('%', '').trim().replace(',', '.'));
+    if (!isNaN(parsedPct)) {
+      const stars = Math.max(0, Math.min(5, Math.round((parsedPct / 100) * 10) / 2));
+      return { stars, raw: clean };
+    }
+  }
+
+  // 3. Try to parse as raw number
+  const num = parseFloat(clean.replace(',', '.'));
+  if (!isNaN(num)) {
+    if (num <= 5) {
+      return { stars: num, raw: `${(num * 20).toFixed(0)}%` };
+    }
+    if (num <= 100) {
+      const stars = Math.max(0, Math.min(5, Math.round((num / 100) * 10) / 2));
+      return { stars, raw: `${num}%` };
+    }
+    const pct = (num / 200) * 100;
+    const stars = Math.max(0, Math.min(5, Math.round((pct / 100) * 10) / 2));
+    return { stars, raw: `${pct.toFixed(0)}%` };
+  }
+
+  return { stars: 2, raw: clean };
+};
+
+export function ClipboardImporter({ onImportPlayers, currentPlayersCount, gameDate, onChangeGameDate }: ClipboardImporterProps) {
   const [pasteData, setPasteData] = useState('');
   const [importMode, setImportMode] = useState<'replace' | 'append'>('append');
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -103,7 +147,9 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount }: Clip
       const hasHeaders = cellsInHeader.some(cell => 
         cell.includes("id") || cell.includes("nombre") || cell.includes("name") || 
         cell.includes("pos") || cell.includes("edad") || cell.includes("age") || 
-        cell.includes("valor") || cell.includes("value") || cell.includes("sueldo") || cell.includes("wage")
+        cell.includes("valor") || cell.includes("value") || cell.includes("vlr") ||
+        cell.includes("sueldo") || cell.includes("wage") || cell.includes("sal") ||
+        cell.includes("sdo")
       );
 
       const startIndex = hasHeaders ? 1 : 0;
@@ -145,17 +191,13 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount }: Clip
             if (header === "club id" || header === "clubid") {
               clubId = val;
             } else if (header.includes("best pot rating") || header.includes("bestpotrating") || header.includes("mejor pot") || header.includes("calidad potencial %") || header === "best pot rating") {
-              bestPotRating = val;
-              const parsedPct = parseFloat(val.replace(',', '.'));
-              if (!isNaN(parsedPct)) {
-                potentialAbility = Math.max(1, Math.min(5, Math.round((parsedPct / 100) * 5)));
-              }
+              const res = parseImportedRating(val);
+              bestPotRating = res.raw;
+              potentialAbility = res.stars;
             } else if (header.includes("best rating") || header.includes("bestrating") || header.includes("mejor cal") || header.includes("calidad actual %") || header.includes("calidad de juego") || header === "best rating") {
-              bestRating = val;
-              const parsedPct = parseFloat(val.replace(',', '.'));
-              if (!isNaN(parsedPct)) {
-                currentAbility = Math.max(1, Math.min(5, Math.round((parsedPct / 100) * 5)));
-              }
+              const res = parseImportedRating(val);
+              bestRating = res.raw;
+              currentAbility = res.stars;
             } else if (header === "unique id" || header === "uid" || header === "id único" || header === "id" || header === "pk" || (header.includes("id") && !header.includes("club"))) {
               id = val;
             } else if (header.includes("nombre") || header.includes("name") || header === "nom") {
@@ -167,9 +209,9 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount }: Clip
               position = val;
             } else if (header.includes("nacionalidad") || header.includes("nac") || header.includes("nat") || header.includes("país") || header.includes("nation")) {
               nationality = val;
-            } else if (header.includes("valor") || header.includes("value") || header === "val") {
+            } else if (header.includes("valor") || header.includes("value") || header === "val" || header === "vlr" || header.includes("vlr")) {
               marketValue = formatImportedValue(val);
-            } else if (header.includes("sueldo") || header.includes("wage") || header.includes("sal") || header.includes("contrato")) {
+            } else if (header.includes("sueldo") || header.includes("wage") || header.includes("sal") || header.includes("sdo") || header === "sdo" || header === "sdo.") {
               wage = formatImportedWage(val);
             } else if (header === "club") {
               club = val;
@@ -391,6 +433,21 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount }: Clip
         </p>
       </div>
 
+      {/* Game Date Config Block */}
+      <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="space-y-0.5">
+          <span className="font-bold text-slate-200 block">📅 Fecha de Juego Actual (FM)</span>
+          <span className="text-[10.5px] text-slate-400">Esta fecha se utilizará como referencia exacta para calcular las edades y contratos.</span>
+        </div>
+        <input
+          type="text"
+          placeholder="Ej. 18/12/2036"
+          value={gameDate}
+          onChange={(e) => onChangeGameDate(e.target.value)}
+          className="bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-white font-mono text-center w-40 focus:border-emerald-500 focus:outline-none"
+        />
+      </div>
+
       {/* Paste Zone */}
       <div className="space-y-2">
         <label className="text-xs uppercase font-mono font-bold text-slate-400">Pega tu portapapeles aquí:</label>
@@ -404,10 +461,10 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount }: Clip
       </div>
 
       {/* Actions and Mode Selector */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900/50 p-3 rounded-xl border border-slate-850">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-slate-900/50 p-3 rounded-xl border border-slate-850">
         
         {/* Mode choice */}
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-4 text-xs">
           <span className="font-bold text-slate-300">Modo de Importación:</span>
           <label className="flex items-center gap-1.5 cursor-pointer text-slate-300">
             <input
@@ -417,7 +474,7 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount }: Clip
               onChange={() => setImportMode('append')}
               className="text-emerald-500 focus:ring-emerald-500 bg-slate-950 border-slate-800"
             />
-            <span>Añadir al plantel actual ({currentPlayersCount} actuales)</span>
+            <span>Solo añadir nuevos ({currentPlayersCount} actuales)</span>
           </label>
           <label className="flex items-center gap-1.5 cursor-pointer text-slate-300">
             <input
@@ -427,7 +484,7 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount }: Clip
               onChange={() => setImportMode('replace')}
               className="text-emerald-500 focus:ring-emerald-500 bg-slate-950 border-slate-800"
             />
-            <span className="text-rose-400 font-medium">Reemplazar plantilla existente</span>
+            <span className="text-amber-400 font-medium">Actualizar existentes y añadir nuevos (Fusionar sin borrar)</span>
           </label>
         </div>
 

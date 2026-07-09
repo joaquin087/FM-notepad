@@ -28,6 +28,11 @@ export interface Player {
   montoBaja?: string;
   clubBaja?: string;
   comentarioBaja?: string;
+
+  // Cedidos fields
+  clubPrestamo?: string; // loan destination team
+  finPrestamo?: string; // loan end year / date
+  opcionCompra?: string; // purchase option value
 }
 
 export interface Snapshot {

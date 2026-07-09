@@ -33,11 +33,37 @@ const getPositionStyle = (formationKey: string, posKey: string): { left: string;
       DFCR: { left: '62%', top: '72%' },
       DFR: { left: '84%', top: '70%' },
       DM: { left: '50%', top: '56%' },
-      MCL: { left: '30%', top: '40%' },
-      MCR: { left: '70%', top: '40%' },
+      MCL: { left: '32%', top: '44%' },
+      MCR: { left: '68%', top: '44%' },
       AML: { left: '18%', top: '22%' },
       AMR: { left: '82%', top: '22%' },
       STC: { left: '50%', top: '12%' },
+    },
+    "433gala": {
+      GK: { left: '50%', top: '88%' },
+      DFL: { left: '16%', top: '70%' },
+      DFCL: { left: '38%', top: '72%' },
+      DFCR: { left: '62%', top: '72%' },
+      DFR: { left: '84%', top: '70%' },
+      DM: { left: '50%', top: '60%' },
+      MCR: { left: '60%', top: '44%' },
+      AMC: { left: '42%', top: '34%' },
+      AML: { left: '16%', top: '32%' },
+      AMR: { left: '84%', top: '32%' },
+      STC: { left: '50%', top: '14%' },
+    },
+    "41212": {
+      GK: { left: '50%', top: '88%' },
+      DFL: { left: '16%', top: '70%' },
+      DFCL: { left: '38%', top: '72%' },
+      DFCR: { left: '62%', top: '72%' },
+      DFR: { left: '84%', top: '70%' },
+      DM: { left: '50%', top: '56%' },
+      MCL: { left: '32%', top: '44%' },
+      MCR: { left: '68%', top: '44%' },
+      AMC: { left: '50%', top: '30%' },
+      STCL: { left: '34%', top: '14%' },
+      STCR: { left: '66%', top: '14%' },
     },
     "352": {
       GK: { left: '50%', top: '88%' },
@@ -71,17 +97,20 @@ const getPositionStyle = (formationKey: string, posKey: string): { left: string;
 
 export function PitchView({ activeFormation, players, assignments, onSelectPosition, activePositionKey }: PitchViewProps) {
   
-  // Helper to extract player's last name or short name
+  // Helper to extract player's short name (First Name + Last Name Initial)
   const getPlayerShortName = (playerId: string | null): string => {
     if (!playerId) return "Vacío";
     const player = players.find(p => p.id === playerId);
     if (!player) return "Vacío";
     
-    // Split name and return last part or first name if single word
-    const parts = player.name.split(' ');
+    const parts = player.name.trim().split(/\s+/);
     if (parts.length > 1) {
-      // Return e.g. "Lewandowski" or "De Jong"
-      return parts.slice(-1)[0];
+      const firstName = parts[0];
+      const secondPart = parts[1];
+      if (secondPart && secondPart.length > 0) {
+        return `${firstName} ${secondPart[0].toUpperCase()}.`;
+      }
+      return firstName;
     }
     return player.name;
   };

@@ -28,6 +28,19 @@ interface PlanningGridProps {
   gameYear: number;
 }
 
+const formatShortPlayerName = (name: string): string => {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length > 1) {
+    const firstName = parts[0];
+    const secondPart = parts[1];
+    if (secondPart && secondPart.length > 0) {
+      return `${firstName} ${secondPart[0].toUpperCase()}.`;
+    }
+    return firstName;
+  }
+  return name;
+};
+
 export const SQUAD_CATEGORIES = [
   { key: 'titular', label: 'Titular', textColor: 'text-emerald-400', bgColor: 'bg-emerald-950/20', borderColor: 'border-emerald-500/30', headerColor: 'border-l-4 border-l-emerald-500' },
   { key: 'suplente', label: 'Suplente', textColor: 'text-amber-400', bgColor: 'bg-amber-950/20', borderColor: 'border-amber-500/30', headerColor: 'border-l-4 border-l-amber-500' },
@@ -42,16 +55,16 @@ export const SQUAD_CATEGORIES = [
 
 export const POSITION_COLUMNS = [
   { key: 'GK', label: 'GK', name: 'Arquero' },
-  { key: 'DFCD', label: 'DFCD', name: 'Defensor Central Der.' },
-  { key: 'DFCI', label: 'DFCI', name: 'Defensor Central Izq.' },
-  { key: 'WR', label: 'WR', name: 'Carrilero Derecho' },
+  { key: 'WL', label: 'D (L)', name: 'Lateral Izquierdo' },
+  { key: 'WR', label: 'D (R)', name: 'Lateral Derecho' },
+  { key: 'DFCI', label: 'D (CL)', name: 'Central Izquierdo' },
+  { key: 'DFCD', label: 'D (CR)', name: 'Central Derecho' },
   { key: 'DM', label: 'DM', name: 'Pivote Defensivo' },
-  { key: 'WL', label: 'WL', name: 'Carrilero Izquierdo' },
   { key: 'MC', label: 'MC', name: 'Mediocentro' },
-  { key: 'MPC', label: 'MPC', name: 'Mediapunta Centro' },
-  { key: 'MPI', label: 'MPI', name: 'Extremo Izquierdo' },
-  { key: 'MPD', label: 'MPD', name: 'Extremo Derecho' },
-  { key: 'DLC', label: 'DLC', name: 'Delantero Centro' }
+  { key: 'MPC', label: 'AM(C)', name: 'Mediapunta Centro' },
+  { key: 'MPI', label: 'AM (L)', name: 'Extremo Izquierdo' },
+  { key: 'MPD', label: 'AM (R)', name: 'Extremo Derecho' },
+  { key: 'DLC', label: 'ST (C)', name: 'Delantero Centro' }
 ] as const;
 
 // Helper function to auto-detect the best column from actual FM position
@@ -252,7 +265,7 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, ga
           
           {/* Scrollable Matrix Table */}
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left min-w-[900px]">
+            <table className="w-full border-collapse text-left min-w-[1300px]">
               
               {/* Header row containing Positions */}
               <thead>
@@ -261,9 +274,9 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, ga
                     Estatus / Categoría
                   </th>
                   {POSITION_COLUMNS.map(col => (
-                    <th key={col.key} className="p-3 text-center border-r border-slate-850/50 min-w-[85px] group">
+                    <th key={col.key} className="p-3 text-center border-r border-slate-850/50 min-w-[115px] group">
                       <div className="text-xs font-bold text-white tracking-wide">{col.key}</div>
-                      <div className="text-[9px] text-slate-500 font-mono font-medium truncate max-w-[85px]" title={col.name}>
+                      <div className="text-[9px] text-slate-500 font-mono font-medium truncate max-w-[110px]" title={col.name}>
                         {col.name}
                       </div>
                     </th>
@@ -295,9 +308,9 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, ga
                         return (
                           <td 
                             key={col.key} 
-                            className={`p-1.5 border-r border-slate-850/40 relative min-w-[90px] h-16 hover:bg-slate-900/40 transition group`}
+                            className="p-1.5 border-r border-slate-850/40 relative min-w-[115px] h-auto hover:bg-slate-900/40 transition group align-top"
                           >
-                            <div className="h-full w-full flex flex-col justify-between">
+                            <div className="min-h-[75px] w-full flex flex-col justify-between gap-2">
                               
                               {/* Player items inside this cell */}
                               <div className="space-y-1">
@@ -323,13 +336,13 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, ga
                                       {/* Player Name */}
                                       <div className="text-[10px] font-bold text-slate-100 truncate pr-2.5 leading-tight flex items-center gap-1" title={`${p.name} (${p.nationality})`}>
                                         <span className="text-[9px]" title={p.nationality}>{flag}</span>
-                                        <span className="truncate">{p.name.split(' ').pop() || p.name}</span>
+                                        <span className="truncate">{formatShortPlayerName(p.name)}</span>
                                       </div>
                                       
                                       {/* Ability, Age */}
                                       <div className="flex justify-between items-center text-[8px] font-mono mt-0.5 text-slate-400">
                                         <span className={ratingColor}>{p.currentAbility}★</span>
-                                        <span>{calculateAgeFromDOB(p.dateOfBirth, p.age, gameYear)}a</span>
+                                        <span>{calculateAgeFromDOB(p.dateOfBirth, p.age, gameYear)}</span>
                                       </div>
 
                                       {/* Small remove icon on hover */}

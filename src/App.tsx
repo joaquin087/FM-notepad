@@ -6,6 +6,7 @@ import { RosterManager } from './components/RosterManager';
 import { ClipboardImporter } from './components/ClipboardImporter';
 import { ProgressionTracker } from './components/ProgressionTracker';
 import { PlanningGrid, getAutoColumn } from './components/PlanningGrid';
+import { isTurkishPlayer } from './utils/flags';
 import { 
   Users, 
   Settings, 
@@ -58,6 +59,51 @@ export default function App() {
     const saved = localStorage.getItem("fm_game_year");
     return saved ? parseInt(saved, 10) : 2036;
   });
+
+  const [gameDate, setGameDate] = useState<string>(() => {
+    const saved = localStorage.getItem("fm_game_date");
+    return saved ? saved : `30/06/${saved ? parseInt(saved, 10) : 2036}`;
+  });
+
+  const [isEditingYear, setIsEditingYear] = useState(false);
+  const [tempYearInput, setTempYearInput] = useState(String(gameYear));
+
+  // keep tempYearInput in sync with gameYear
+  useEffect(() => {
+    setTempYearInput(String(gameYear));
+  }, [gameYear]);
+
+  // Sync gameDate with localStorage and update gameYear if gameDate is edited elsewhere
+  useEffect(() => {
+    localStorage.setItem("fm_game_date", gameDate);
+    const parts = gameDate.split(/[\.\-\/]+/);
+    if (parts.length === 3) {
+      const year = parseInt(parts[2]);
+      if (!isNaN(year) && year >= 1900 && year <= 2100) {
+        setGameYear(year);
+      }
+    }
+  }, [gameDate]);
+
+  const updateGameYear = (year: number) => {
+    setGameYear(year);
+    const parts = gameDate.split(/[\.\-\/]+/);
+    if (parts.length === 3) {
+      setGameDate(`${parts[0]}/${parts[1]}/${year}`);
+    } else {
+      setGameDate(`30/06/${year}`);
+    }
+  };
+
+  const handleYearSubmit = () => {
+    const val = parseInt(tempYearInput, 10);
+    if (!isNaN(val) && val >= 1900 && val <= 2100) {
+      updateGameYear(val);
+    } else {
+      setTempYearInput(String(gameYear));
+    }
+    setIsEditingYear(false);
+  };
 
   const [activeTab, setActiveTab] = useState<'squad_pitch' | 'players_list' | 'clipboard_import' | 'stats' | 'progression_tracker' | 'planning_grid'>('planning_grid');
   const [selectedPosition, setSelectedPosition] = useState<PitchPosition | null>(null);
@@ -486,9 +532,18 @@ export default function App() {
   // Calculate high level stats for display
   const totalPlayers = players.length;
   const planGksCount = players.filter(p => p.squadStatus && p.squadStatus !== 'no_asignado').length;
-  const loanListCount = players.filter(p => p.squadStatus === 'cesion').length;
+  const loanListCount = players.filter(p => p.squadStatus === 'cedidos').length;
   const sellListCount = players.filter(p => p.squadStatus === 'venta').length;
   const unassignedCount = players.filter(p => p.squadStatus === 'no_asignado').length;
+
+  // Calculate non-Turkish squad players limit (titular, suplente, juvenil)
+  const coreSquadPlayers = players.filter(p => 
+    p.squadStatus === 'titular' || 
+    p.squadStatus === 'suplente' || 
+    p.squadStatus === 'juvenil'
+  );
+  const nonTurkishCorePlayers = coreSquadPlayers.filter(p => !isTurkishPlayer(p.nationality));
+  const nonTurkishCount = nonTurkishCorePlayers.length;
 
   const averageAge = totalPlayers > 0 
     ? (players.reduce((sum, p) => sum + p.age, 0) / totalPlayers).toFixed(1) 
@@ -505,10 +560,16 @@ export default function App() {
     return num;
   };
 
-  const totalWeeklyWages = players.reduce((sum, p) => sum + parseWageNumeric(p.wage), 0);
-  const formattedWeeklyWages = totalWeeklyWages >= 1000000 
-    ? `€${(totalWeeklyWages / 1000000).toFixed(2)}M/semana`
-    : `€${(totalWeeklyWages / 1000).toFixed(0)}K/semana`;
+  // Filter out players with 'cedidos' status from budget sum
+  const totalWeeklyWages = players
+    .filter(p => p.squadStatus !== 'cedidos')
+    .reduce((sum, p) => sum + parseWageNumeric(p.wage), 0);
+
+  // Compute total annual wage (weekly * 52.1429)
+  const totalAnnualWages = totalWeeklyWages * 52.1429;
+  const formattedAnnualWages = totalAnnualWages >= 1000000 
+    ? `€${(totalAnnualWages / 1000000).toFixed(2)}M p/a`
+    : `€${(totalAnnualWages / 1000).toFixed(0)}K p/a`;
 
   // Filter candidates for selected position
   const getCandidatesForSelectedPosition = () => {
@@ -533,10 +594,19 @@ export default function App() {
       // Position filter: If "showAllCandidates" is true, show everyone, else show natural fits
       if (showAllCandidates) return true;
 
-      // Map compatible tags (e.g. D (C) is compatible with DFC)
-      return selectedPosition.compatiblePositions.some(comp => 
-        p.position.toUpperCase().includes(comp.toUpperCase())
-      );
+      // Treat D(CL), D(CR), and D(C) as fully compatible
+      return selectedPosition.compatiblePositions.some(comp => {
+        const pPos = p.position.toUpperCase().trim();
+        const cPos = comp.toUpperCase().trim();
+
+        const isPlayerDC = pPos.includes("D (C)") || pPos.includes("D(C)") || pPos.includes("D (CL)") || pPos.includes("D (CR)") || pPos.includes("D(CL)") || pPos.includes("D(CR)");
+        const isCompDC = cPos.includes("D (C)") || cPos.includes("D(C)") || cPos.includes("D (CL)") || cPos.includes("D (CR)") || cPos.includes("D(CL)") || cPos.includes("D(CR)");
+
+        if (isPlayerDC && isCompDC) {
+          return true;
+        }
+        return pPos.includes(cPos);
+      });
     }).sort((a, b) => b.currentAbility - a.currentAbility); // Sort by quality first
   };
 
@@ -562,15 +632,39 @@ export default function App() {
           <div className="flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-full px-2 py-0.5 text-slate-300 select-none">
             <span className="text-[10px] uppercase font-bold text-slate-400 font-mono px-1">Año:</span>
             <button
-              onClick={() => setGameYear(prev => Math.max(1900, prev - 1))}
+              onClick={() => updateGameYear(Math.max(1900, gameYear - 1))}
               className="w-4.5 h-4.5 rounded-full bg-slate-950 hover:bg-slate-700 text-white font-bold flex items-center justify-center text-[10px] border border-slate-700 transition"
               title="Restar año"
             >
               -
             </button>
-            <strong className="text-white font-semibold font-mono px-1 text-[11px]">{gameYear}</strong>
+            {isEditingYear ? (
+              <input
+                type="text"
+                value={tempYearInput}
+                onChange={(e) => setTempYearInput(e.target.value)}
+                onBlur={handleYearSubmit}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleYearSubmit();
+                  if (e.key === 'Escape') {
+                    setTempYearInput(String(gameYear));
+                    setIsEditingYear(false);
+                  }
+                }}
+                className="w-12 text-center bg-slate-950 border border-slate-700 rounded text-white font-mono text-[11px] focus:outline-none"
+                autoFocus
+              />
+            ) : (
+              <strong 
+                onClick={() => setIsEditingYear(true)}
+                className="text-white font-semibold font-mono px-1 text-[11px] cursor-pointer hover:bg-slate-700 rounded transition"
+                title="Haga clic para introducir con el teclado"
+              >
+                {gameYear}
+              </strong>
+            )}
             <button
-              onClick={() => setGameYear(prev => Math.min(2100, prev + 1))}
+              onClick={() => updateGameYear(Math.min(2100, gameYear + 1))}
               className="w-4.5 h-4.5 rounded-full bg-slate-950 hover:bg-slate-700 text-white font-bold flex items-center justify-center text-[10px] border border-slate-700 transition"
               title="Sumar año"
             >
@@ -581,7 +675,7 @@ export default function App() {
             Total: <strong className="text-white font-semibold font-sans">{totalPlayers} Jugadores</strong>
           </span>
           <span className="px-3 py-1 bg-slate-800 rounded-full text-xs font-medium border border-slate-700 text-slate-300">
-            Presupuesto: <strong className="text-white font-semibold font-sans">{formattedWeeklyWages}/sem</strong>
+            Presupuesto: <strong className="text-white font-semibold font-sans">{formattedAnnualWages}</strong>
           </span>
           <span className="px-3 py-1 bg-emerald-900/30 text-emerald-400 rounded-full text-xs font-medium border border-emerald-800/50">
             Media Edad: <strong className="text-emerald-300 font-semibold font-sans">{averageAge} años</strong>
@@ -988,6 +1082,7 @@ export default function App() {
             onResetToDefaults={handleResetToDefaults}
             onDeleteAllPlayers={handleDeleteAllPlayers}
             gameYear={gameYear}
+            gameDate={gameDate}
           />
         )}
 
@@ -996,6 +1091,8 @@ export default function App() {
           <ClipboardImporter
             onImportPlayers={handleImportPlayers}
             currentPlayersCount={players.length}
+            gameDate={gameDate}
+            onChangeGameDate={setGameDate}
           />
         )}
 
@@ -1003,7 +1100,7 @@ export default function App() {
         {activeTab === 'stats' && (
           <div className="space-y-5">
             {/* Auditing Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-mono">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-xs font-mono">
               <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-1 shadow-md">
                 <span className="text-slate-500 uppercase text-[9px] font-bold block">Plantilla del Club</span>
                 <span className="text-white font-sans text-xl font-extrabold">{totalPlayers}</span>
@@ -1023,6 +1120,26 @@ export default function App() {
                 <span className="text-slate-500 uppercase text-[9px] font-bold block">Lista de Ventas</span>
                 <span className="text-rose-400 font-sans text-xl font-extrabold">{sellListCount}</span>
                 <span className="text-slate-500 text-[10px] block mt-1">Jugadores listados como transferibles</span>
+              </div>
+              <div className={`border p-4 rounded-xl space-y-1 shadow-md transition-all ${
+                nonTurkishCount > 17 
+                  ? 'bg-rose-950/20 border-rose-500/30' 
+                  : 'bg-slate-900 border-slate-800'
+              }`}>
+                <span className="text-slate-500 uppercase text-[9px] font-bold block">Cupo Extranjeros</span>
+                <span className={`font-sans text-xl font-extrabold flex items-baseline gap-1 ${
+                  nonTurkishCount > 17 ? 'text-rose-500 animate-pulse' : 'text-emerald-400'
+                }`}>
+                  {nonTurkishCount} <span className="text-xs text-slate-500 font-normal">/ 17</span>
+                </span>
+                <span className={`text-[10px] block mt-1 ${
+                  nonTurkishCount > 17 ? 'text-rose-300 font-sans font-medium' : 'text-slate-500'
+                }`}>
+                  {nonTurkishCount > 17 
+                    ? '⚠️ ¡Supera límite de 17!' 
+                    : 'Regla de extranjeros OK'
+                  }
+                </span>
               </div>
             </div>
 
@@ -1072,10 +1189,10 @@ export default function App() {
                     ✈️ Lista de Préstamos Activa ({loanListCount})
                   </h3>
                   <div className="max-h-[140px] overflow-y-auto space-y-1 pr-1 text-[11px] font-sans">
-                    {players.filter(p => p.squadStatus === 'cesion').length === 0 ? (
+                    {players.filter(p => p.squadStatus === 'cedidos').length === 0 ? (
                       <div className="text-slate-500 italic py-2">Ningún jugador marcado para préstamo.</div>
                     ) : (
-                      players.filter(p => p.squadStatus === 'cesion').map(p => (
+                      players.filter(p => p.squadStatus === 'cedidos').map(p => (
                         <div key={p.id} className="flex justify-between items-center bg-slate-950 p-1.5 rounded border border-slate-850">
                           <span className="text-slate-200 font-medium">{p.name} ({p.position})</span>
                           <span className="text-amber-400 font-mono">★ {p.potentialAbility} pot</span>
