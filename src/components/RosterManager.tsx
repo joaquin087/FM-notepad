@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Player } from '../types';
 import { getFlagEmoji, isTurkishPlayer, formatRatingWithPercentage, getPlayerFlags, calculateAgeFromDOB, calculateContractYearsRemaining, calculateAgeFromDOBPrecise, calculateContractYearsRemainingPrecise } from '../utils/flags';
 import { Search, Filter, Plus, Trash2, Edit3, Check, X, Star, AlertCircle, RefreshCw, Trash, FileText, Calendar } from 'lucide-react';
+import { fifaNations } from '../utils/fifaNations';
 
 interface RosterManagerProps {
   players: Player[];
@@ -14,11 +15,23 @@ interface RosterManagerProps {
   gameDate: string;
 }
 
+const getFMStarsAndColor = (pct: number) => {
+  if (pct < 50) {
+    const stars = Math.min(5.0, Math.max(0.5, Math.floor(pct / 5) * 0.5 + 0.5));
+    return { stars, color: 'silver' as const };
+  } else {
+    const stars = Math.min(5.0, Math.max(0.5, Math.floor((pct - 50) / 5) * 0.5 + 0.5));
+    return { stars, color: 'gold' as const };
+  }
+};
+
 export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePlayer, onResetToDefaults, onDeleteAllPlayers, gameYear, gameDate }: RosterManagerProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [positionFilter, setPositionFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [contractYearsFilter, setContractYearsFilter] = useState('ALL');
+  const [minAgeFilter, setMinAgeFilter] = useState<string>('');
+  const [maxAgeFilter, setMaxAgeFilter] = useState<string>('');
 
   // Separate first and last name for manual add player
   const [newFirstName, setNewFirstName] = useState('');
@@ -33,6 +46,27 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
   const [renewAnnualWage, setRenewAnnualWage] = useState('');
 
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [editNacionalidad1, setEditNacionalidad1] = useState('');
+  const [editNacionalidad2, setEditNacionalidad2] = useState('');
+  const [showEditNationsDropdown1, setShowEditNationsDropdown1] = useState(false);
+  const [showEditNationsDropdown2, setShowEditNationsDropdown2] = useState(false);
+  const [editBirthDay, setEditBirthDay] = useState('');
+  const [editBirthMonth, setEditBirthMonth] = useState('');
+  const [editBirthYear, setEditBirthYear] = useState('');
+  const [editContractDay, setEditContractDay] = useState('');
+  const [editContractMonth, setEditContractMonth] = useState('');
+  const [editContractYear, setEditContractYear] = useState('');
+  const [editMarketValueInput, setEditMarketValueInput] = useState('');
+  const [editAnnualWageInput, setEditAnnualWageInput] = useState('');
+
+  const [editBajaDay, setEditBajaDay] = useState('');
+  const [editBajaMonth, setEditBajaMonth] = useState('');
+  const [editBajaYear, setEditBajaYear] = useState('');
+  const [editPrestamoDay, setEditPrestamoDay] = useState('');
+  const [editPrestamoMonth, setEditPrestamoMonth] = useState('');
+  const [editPrestamoYear, setEditPrestamoYear] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
   // Sorting state
@@ -174,12 +208,24 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
     bestPotRating: ''
   });
 
-  const [newCaInput, setNewCaInput] = useState('60%');
-  const [newPaInput, setNewPaInput] = useState('80%');
+  const [newCaInput, setNewCaInput] = useState('3.0');
+  const [newPaInput, setNewPaInput] = useState('4.0');
   const [customId, setCustomId] = useState('');
-  const [contractEndInput, setContractEndInput] = useState('30/6/2028');
-  const [dateOfBirthInput, setDateOfBirthInput] = useState('18/12/2001');
-  const [clubInput, setClubInput] = useState('');
+  
+  const [nacionalidad1, setNacionalidad1] = useState('Argentina');
+  const [nacionalidad2, setNacionalidad2] = useState('');
+  const [showNationsDropdown1, setShowNationsDropdown1] = useState(false);
+  const [showNationsDropdown2, setShowNationsDropdown2] = useState(false);
+  
+  const [contractEndDay, setContractEndDay] = useState('30');
+  const [contractEndMonth, setContractEndMonth] = useState('6');
+  const [contractEndYear, setContractEndYear] = useState('2028');
+
+  const [birthDay, setBirthDay] = useState('18');
+  const [birthMonth, setBirthMonth] = useState('12');
+  const [birthYear, setBirthYear] = useState('2001');
+
+  const [newMarketValueInput, setNewMarketValueInput] = useState('1500000');
 
   const [editCaInput, setEditCaInput] = useState('');
   const [editPaInput, setEditPaInput] = useState('');
@@ -257,17 +303,24 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
       if (yearsVal < 0) {
         matchesContractYears = false;
       } else {
-        const floorYears = Math.floor(yearsVal);
-        const filterValNum = parseInt(contractYearsFilter);
-        if (filterValNum === 5) {
-          matchesContractYears = yearsVal >= 5;
-        } else {
-          matchesContractYears = floorYears === filterValNum;
+        const displayYears = Math.round(yearsVal * 10) / 10;
+        if (contractYearsFilter === '1_or_less') {
+          matchesContractYears = displayYears <= 1.0;
+        } else if (contractYearsFilter === '2') {
+          matchesContractYears = displayYears > 1.0 && displayYears <= 2.0;
+        } else if (contractYearsFilter === '3') {
+          matchesContractYears = displayYears > 2.0 && displayYears <= 3.0;
+        } else if (contractYearsFilter === '4_or_more') {
+          matchesContractYears = displayYears > 3.0;
         }
       }
     }
 
-    return matchesSearch && matchesPosition && matchesStatus && matchesContractYears;
+    const calculatedAge = calculateAgeFromDOBPrecise(player.dateOfBirth, player.age, gameDate);
+    const matchesMinAge = minAgeFilter === '' || calculatedAge >= parseInt(minAgeFilter);
+    const matchesMaxAge = maxAgeFilter === '' || calculatedAge <= parseInt(maxAgeFilter);
+
+    return matchesSearch && matchesPosition && matchesStatus && matchesContractYears && matchesMinAge && matchesMaxAge;
   });
 
   // Calculate sortedPlayers
@@ -344,27 +397,264 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
 
   const handleEditClick = (player: Player) => {
     setEditingPlayer({ ...player });
-    setEditCaInput(player.bestRating || `${(player.currentAbility * 20).toFixed(0)}%`);
-    setEditPaInput(player.bestPotRating || `${(player.potentialAbility * 20).toFixed(0)}%`);
     setFormError('');
+
+    // Set CA and PA clean floats (e.g. "3.5" or "4")
+    setEditCaInput(player.currentAbility.toString());
+    setEditPaInput(player.potentialAbility.toString());
+
+    // Parse Name
+    let firstName = '';
+    let lastName = '';
+    if (player.name.includes(',')) {
+      const nameParts = player.name.split(',');
+      lastName = nameParts[0].trim();
+      firstName = nameParts[1].trim();
+    } else {
+      const nameParts = player.name.trim().split(/\s+/);
+      if (nameParts.length > 1) {
+        firstName = nameParts[0];
+        lastName = nameParts.slice(1).join(' ');
+      } else {
+        lastName = player.name;
+        firstName = '';
+      }
+    }
+    setEditFirstName(firstName);
+    setEditLastName(lastName);
+
+    // Parse Nationalities
+    let nac1 = '';
+    let nac2 = '';
+    if (player.nationality) {
+      const natParts = player.nationality.split('/');
+      nac1 = natParts[0].trim();
+      if (natParts.length > 1) {
+        nac2 = natParts[1].trim();
+      }
+    }
+    setEditNacionalidad1(nac1);
+    setEditNacionalidad2(nac2);
+
+    // Parse DOB
+    let bD = '18';
+    let bM = '12';
+    let bY = '2001';
+    if (player.dateOfBirth) {
+      const parts = player.dateOfBirth.split(/[\.\-\/]+/);
+      if (parts.length === 3) {
+        bD = parts[0];
+        bM = parts[1];
+        bY = parts[2];
+      }
+    }
+    setEditBirthDay(bD);
+    setEditBirthMonth(bM);
+    setEditBirthYear(bY);
+
+    // Parse Contract End
+    let cD = '30';
+    let cM = '6';
+    let cY = '2028';
+    if (player.contractEnd && player.contractEnd !== 'N/A' && player.contractEnd !== 'N/D') {
+      const parts = player.contractEnd.split(/[\.\-\/]+/);
+      if (parts.length === 3) {
+        cD = parts[0];
+        cM = parts[1];
+        cY = parts[2];
+      }
+    }
+    setEditContractDay(cD);
+    setEditContractMonth(cM);
+    setEditContractYear(cY);
+
+    // Market Value numeric input
+    const mvVal = parseMarketValueToNumeric(player.marketValue);
+    setEditMarketValueInput(mvVal > 0 ? String(mvVal) : '');
+
+    // Annual wage numeric input
+    const weeklyWage = parseWageToNumeric(player.wage);
+    const annualWage = Math.round(weeklyWage * 52);
+    setEditAnnualWageInput(annualWage > 0 ? String(annualWage) : '');
+
+    // Parse fechaBaja
+    if (player.fechaBaja) {
+      const parts = player.fechaBaja.split(/[\.\-\/]+/);
+      if (parts.length === 3) {
+        setEditBajaDay(parts[0]);
+        setEditBajaMonth(parts[1]);
+        setEditBajaYear(parts[2]);
+      } else {
+        setEditBajaDay('');
+        setEditBajaMonth('');
+        setEditBajaYear(player.fechaBaja);
+      }
+    } else {
+      setEditBajaDay('');
+      setEditBajaMonth('');
+      setEditBajaYear('');
+    }
+
+    // Parse finPrestamo
+    if (player.finPrestamo) {
+      const parts = player.finPrestamo.split(/[\.\-\/]+/);
+      if (parts.length === 3) {
+        setEditPrestamoDay(parts[0]);
+        setEditPrestamoMonth(parts[1]);
+        setEditPrestamoYear(parts[2]);
+      } else {
+        setEditPrestamoDay('');
+        setEditPrestamoMonth('');
+        setEditPrestamoYear(player.finPrestamo);
+      }
+    } else {
+      setEditPrestamoDay('');
+      setEditPrestamoMonth('');
+      setEditPrestamoYear('');
+    }
   };
 
   const handleSaveEdit = () => {
     if (editingPlayer) {
-      if (!editingPlayer.name.trim()) {
-        setFormError("El nombre del jugador es requerido.");
+      // Name split validation
+      const trimmedFirst = editFirstName.trim();
+      const trimmedLast = editLastName.trim();
+      if (!trimmedLast) {
+        setFormError("El apellido del jugador es obligatorio.");
         return;
       }
-      
-      const parsedCa = parseAbilityInput(editCaInput);
-      const parsedPa = parseAbilityInput(editPaInput);
+      const finalName = trimmedFirst ? `${trimmedLast}, ${trimmedFirst}` : trimmedLast;
+
+      // Nationality validation
+      const mainNac = editNacionalidad1.trim();
+      if (!mainNac) {
+        setFormError("La primera nacionalidad es obligatoria.");
+        return;
+      }
+      const finalNationality = editNacionalidad2.trim()
+        ? `${mainNac} / ${editNacionalidad2.trim()}`
+        : mainNac;
+
+      // Date of Birth validation and age calculation
+      const bD = parseInt(editBirthDay, 10);
+      const bM = parseInt(editBirthMonth, 10);
+      const bY = parseInt(editBirthYear, 10);
+      if (!editBirthDay || !editBirthMonth || !editBirthYear) {
+        setFormError("La fecha de nacimiento es obligatoria (Completa Día, Mes, Año).");
+        return;
+      }
+      if (isNaN(bD) || bD < 1 || bD > 31 || isNaN(bM) || bM < 1 || bM > 12 || isNaN(bY) || bY < 1900 || bY > 2100) {
+        setFormError("Fecha de nacimiento inválida.");
+        return;
+      }
+      const finalDob = `${editBirthDay}/${editBirthMonth}/${editBirthYear}`;
+      const calculatedAge = calculateAgeFromDOBPrecise(finalDob, editingPlayer.age, gameDate);
+
+      // Contract End Date validation
+      const ceD = parseInt(editContractDay, 10);
+      const ceM = parseInt(editContractMonth, 10);
+      const ceY = parseInt(editContractYear, 10);
+      if (!editContractDay || !editContractMonth || !editContractYear) {
+        setFormError("La fecha de fin de contrato es obligatoria (Completa Día, Mes, Año).");
+        return;
+      }
+      if (isNaN(ceD) || ceD < 1 || ceD > 31 || isNaN(ceM) || ceM < 1 || ceM > 12 || isNaN(ceY) || ceY < 1900 || ceY > 2100) {
+        setFormError("Fecha de fin de contrato inválida.");
+        return;
+      }
+      const finalContractEnd = `${editContractDay}/${editContractMonth}/${editContractYear}`;
+
+      // CA (Quality Actual) validation
+      const caClean = editCaInput.trim().replace(',', '.');
+      if (!caClean) {
+        setFormError("La calidad actual (CA) es obligatoria.");
+        return;
+      }
+      if (!/^[0-9]+([.][0-9]{1,2})?$/.test(caClean)) {
+        setFormError("La calidad actual debe ser un número float o entero válido (admite hasta 2 decimales, ej. 3.5 o 3,5).");
+        return;
+      }
+      const caVal = parseFloat(caClean);
+      if (isNaN(caVal) || caVal < 0 || caVal > 200) {
+        setFormError("La calidad actual debe estar entre 0 y 200.");
+        return;
+      }
+
+      // PA (Quality Potencial) validation
+      const paClean = editPaInput.trim().replace(',', '.');
+      if (!paClean) {
+        setFormError("La calidad potencial (PA) es obligatoria.");
+        return;
+      }
+      if (!/^[0-9]+([.][0-9]{1,2})?$/.test(paClean)) {
+        setFormError("La calidad potencial debe ser un número float o entero válido (admite hasta 2 decimales, ej. 4.5 o 4,5).");
+        return;
+      }
+      const paVal = parseFloat(paClean);
+      if (isNaN(paVal) || paVal < 0 || paVal > 200) {
+        setFormError("La calidad potencial debe estar entre 0 y 200.");
+        return;
+      }
+
+      // Market Value validation
+      const mvClean = editMarketValueInput.trim();
+      if (!mvClean) {
+        setFormError("El valor de mercado es obligatorio.");
+        return;
+      }
+      const mvInt = parseInt(mvClean, 10);
+      if (isNaN(mvInt) || mvInt < 0) {
+        setFormError("El valor de mercado debe ser un número entero válido.");
+        return;
+      }
+      const formattedMarketValue = formatMarketValue(mvInt);
+
+      // Annual Wage validation
+      const wageClean = editAnnualWageInput.trim();
+      if (!wageClean) {
+        setFormError("El sueldo anual es obligatorio.");
+        return;
+      }
+      const wageInt = parseInt(wageClean, 10);
+      if (isNaN(wageInt) || wageInt < 0) {
+        setFormError("El sueldo anual debe ser un número entero válido.");
+        return;
+      }
+      const weeklyWageNum = parseAnnualWageInputToWeekly(editAnnualWageInput);
+      const formattedWageStr = formatWeeklyWage(weeklyWageNum);
+
+      const parsedCa = parseAbilityInput(caClean);
+      const parsedPa = parseAbilityInput(paClean);
+
+      let finalFechaBaja = undefined;
+      if (editingPlayer.squadStatus === 'baja') {
+        if (editBajaDay || editBajaMonth || editBajaYear) {
+          finalFechaBaja = `${editBajaDay || '30'}/${editBajaMonth || '06'}/${editBajaYear || '2026'}`;
+        }
+      }
+
+      let finalFinPrestamo = undefined;
+      if (editingPlayer.squadStatus === 'cedidos') {
+        if (editPrestamoDay || editPrestamoMonth || editPrestamoYear) {
+          finalFinPrestamo = `${editPrestamoDay || '30'}/${editPrestamoMonth || '06'}/${editPrestamoYear || '2026'}`;
+        }
+      }
 
       const updatedPlayer: Player = {
         ...editingPlayer,
+        name: finalName,
+        nationality: finalNationality,
+        dateOfBirth: finalDob,
+        age: calculatedAge,
+        contractEnd: finalContractEnd,
+        marketValue: formattedMarketValue,
+        wage: formattedWageStr,
         currentAbility: parsedCa.stars,
         potentialAbility: parsedPa.stars,
         bestRating: parsedCa.rawRating,
         bestPotRating: parsedPa.rawRating,
+        fechaBaja: finalFechaBaja,
+        finPrestamo: finalFinPrestamo,
       };
 
       onUpdatePlayer(updatedPlayer);
@@ -406,25 +696,154 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
     }
   };
 
+  // Helper to format market value to currency string (e.g. 1500000 -> €1.5M)
+  const formatMarketValue = (num: number): string => {
+    if (num >= 1000000) {
+      const val = num / 1000000;
+      return `€${val % 1 === 0 ? val.toFixed(0) : val.toFixed(1)}M`;
+    }
+    if (num >= 1000) {
+      const val = num / 1000;
+      return `€${val % 1 === 0 ? val.toFixed(0) : val.toFixed(1)}K`;
+    }
+    return `€${num.toLocaleString()}`;
+  };
+
+  // Real-time validation errors helper
+  const getFormErrors = (): Record<string, string> => {
+    const errors: Record<string, string> = {};
+
+    // ID validation
+    const idTrimmed = customId.trim();
+    if (!idTrimmed) {
+      errors.customId = "El ID Único es obligatorio.";
+    } else if (!/^\d+$/.test(idTrimmed)) {
+      errors.customId = "El ID Único debe ser solo números enteros (sin comas, puntos o decimales).";
+    } else if (players.some(p => p.id === idTrimmed)) {
+      errors.customId = "Este ID ya está registrado en el plantel.";
+    }
+
+    // Nombre & Apellido validation
+    if (!newFirstName.trim()) {
+      errors.newFirstName = "El primer nombre es obligatorio.";
+    }
+    if (!newLastName.trim()) {
+      errors.newLastName = "El apellido es obligatorio.";
+    }
+
+    // Nacionalidad validation
+    const nac1 = nacionalidad1.trim();
+    const nac2 = nacionalidad2.trim();
+    if (!nac1) {
+      errors.nacionalidad1 = "La primera nacionalidad es obligatoria.";
+    }
+    if (nac1 && nac2 && nac1.toLowerCase() === nac2.toLowerCase()) {
+      errors.nacionalidad2 = "La primera y segunda nacionalidad no pueden ser el mismo país.";
+    }
+
+    // Valor de mercado validation
+    const vmTrimmed = newMarketValueInput.trim();
+    if (!vmTrimmed) {
+      errors.marketValue = "El valor de mercado es obligatorio.";
+    } else if (!/^\d+$/.test(vmTrimmed)) {
+      errors.marketValue = "Solo números enteros (sin comas, puntos, letras, símbolos ni €).";
+    }
+
+    // Sueldo anual validation
+    const saTrimmed = newAnnualWageInput.trim();
+    if (!saTrimmed) {
+      errors.annualWage = "El sueldo anual es obligatorio.";
+    } else if (!/^\d+$/.test(saTrimmed)) {
+      errors.annualWage = "Solo números enteros (sin comas, puntos, letras, símbolos ni €).";
+    }
+
+    // Contract End Date validation
+    const ceD = parseInt(contractEndDay);
+    const ceM = parseInt(contractEndMonth);
+    const ceY = parseInt(contractEndYear);
+    if (!contractEndDay || !contractEndMonth || !contractEndYear) {
+      errors.contractEnd = "Completa todos los campos (Día, Mes, Año).";
+    } else if (isNaN(ceD) || ceD < 1 || ceD > 31) {
+      errors.contractEnd = "Día inválido (1-31).";
+    } else if (isNaN(ceM) || ceM < 1 || ceM > 12) {
+      errors.contractEnd = "Mes inválido (1-12).";
+    } else if (isNaN(ceY) || ceY < 1900 || ceY > 2100) {
+      errors.contractEnd = "Año inválido (1900-2100).";
+    }
+
+    // Date of Birth validation
+    const bD = parseInt(birthDay);
+    const bM = parseInt(birthMonth);
+    const bY = parseInt(birthYear);
+    if (!birthDay || !birthMonth || !birthYear) {
+      errors.dateOfBirth = "Completa todos los campos (Día, Mes, Año).";
+    } else if (isNaN(bD) || bD < 1 || bD > 31) {
+      errors.dateOfBirth = "Día inválido (1-31).";
+    } else if (isNaN(bM) || bM < 1 || bM > 12) {
+      errors.dateOfBirth = "Mes inválido (1-12).";
+    } else if (isNaN(bY) || bY < 1900 || bY > 2100) {
+      errors.dateOfBirth = "Año inválido (1900-2100).";
+    }
+
+    // Calidad Actual validation
+    const caClean = newCaInput.trim().replace(',', '.');
+    if (!caClean) {
+      errors.currentAbility = "La calidad actual es obligatoria.";
+    } else if (!/^[0-9]+([.][0-9]{1,2})?$/.test(caClean)) {
+      errors.currentAbility = "Número float inválido (admite hasta 2 decimales, ej. 3.5 o 3,5).";
+    } else {
+      const val = parseFloat(caClean);
+      if (isNaN(val) || val < 0 || val > 200) {
+        errors.currentAbility = "La calidad debe estar entre 0 y 200.";
+      }
+    }
+
+    // Calidad Potencial validation
+    const paClean = newPaInput.trim().replace(',', '.');
+    if (!paClean) {
+      errors.potentialAbility = "La calidad potencial es obligatoria.";
+    } else if (!/^[0-9]+([.][0-9]{1,2})?$/.test(paClean)) {
+      errors.potentialAbility = "Número float inválido (admite hasta 2 decimales, ej. 4.5 o 4,5).";
+    } else {
+      const val = parseFloat(paClean);
+      if (isNaN(val) || val < 0 || val > 200) {
+        errors.potentialAbility = "La calidad potencial debe estar entre 0 y 200.";
+      }
+    }
+
+    return errors;
+  };
+
   const handleCreatePlayer = () => {
-    const trimmedFirst = newFirstName.trim();
-    const trimmedLast = newLastName.trim();
-    if (!trimmedFirst && !trimmedLast) {
-      setFormError("El nombre y/o apellido del jugador es requerido.");
+    const errors = getFormErrors();
+    if (Object.keys(errors).length > 0) {
+      setFormError("Por favor, corrige los errores en el formulario antes de confirmar.");
       return;
     }
+
+    const trimmedFirst = newFirstName.trim();
+    const trimmedLast = newLastName.trim();
     
     // Format name as "Apellido, Nombre"
     const fullName = trimmedLast && trimmedFirst 
       ? `${trimmedLast}, ${trimmedFirst}` 
       : (trimmedLast || trimmedFirst);
 
-    const generatedId = customId.trim() || String(Date.now());
+    const generatedId = customId.trim();
     const parsedCa = parseAbilityInput(newCaInput);
     const parsedPa = parseAbilityInput(newPaInput);
 
     const weeklyWageNum = parseAnnualWageInputToWeekly(newAnnualWageInput);
     const formattedWageStr = formatWeeklyWage(weeklyWageNum);
+    const formattedMarketValue = formatMarketValue(parseInt(newMarketValueInput));
+
+    const contractEndDateStr = `${contractEndDay}/${contractEndMonth}/${contractEndYear}`;
+    const dateOfBirthStr = `${birthDay}/${birthMonth}/${birthYear}`;
+    const calculatedAge = calculateAgeFromDOBPrecise(dateOfBirthStr, 18, gameDate);
+
+    const combinedNationality = nacionalidad2.trim()
+      ? `${nacionalidad1.trim()} / ${nacionalidad2.trim()}`
+      : nacionalidad1.trim();
 
     onAddPlayer({
       ...newPlayer,
@@ -434,10 +853,13 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
       potentialAbility: parsedPa.stars,
       bestRating: parsedCa.rawRating,
       bestPotRating: parsedPa.rawRating,
-      contractEnd: contractEndInput.trim() || 'N/A',
-      dateOfBirth: dateOfBirthInput.trim() || 'N/A',
-      club: clubInput.trim() || 'N/A',
-      wage: formattedWageStr
+      contractEnd: contractEndDateStr,
+      dateOfBirth: dateOfBirthStr,
+      age: calculatedAge,
+      nationality: combinedNationality,
+      marketValue: formattedMarketValue,
+      wage: formattedWageStr,
+      club: 'N/A'
     });
     
     setIsAdding(false);
@@ -464,34 +886,36 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
       bestRating: '',
       bestPotRating: ''
     });
-    setNewCaInput('60%');
-    setNewPaInput('80%');
+    setNewCaInput('3.0');
+    setNewPaInput('4.0');
     setCustomId('');
-    setContractEndInput('30/6/2028');
-    setDateOfBirthInput('18/12/2001');
-    setClubInput('');
+    setNacionalidad1('Argentina');
+    setNacionalidad2('');
+    setContractEndDay('30');
+    setContractEndMonth('6');
+    setContractEndYear('2028');
+    setBirthDay('18');
+    setBirthMonth('12');
+    setBirthYear('2001');
+    setNewMarketValueInput('1500000');
   };
 
-  // Helper to render beautiful yellow stars with percentage
+  // Helper to render beautiful yellow or silver stars with percentage
   const renderStarsWithPercentage = (starsCount: number, customRating?: string) => {
-    let pct = `${(starsCount * 20).toFixed(1)}%`;
-    if (customRating) {
-      if (customRating.includes('%')) {
-        pct = customRating;
-      } else {
-        const parsed = parseFloat(customRating);
-        if (!isNaN(parsed)) {
-          pct = parsed <= 100 ? `${parsed.toFixed(1)}%` : `${((parsed / 200) * 100).toFixed(1)}%`;
-        }
-      }
-    }
+    const pctVal = getPercentageValue(starsCount, customRating);
+    const pct = `${pctVal.toFixed(1)}%`;
+
+    const { stars, color } = getFMStarsAndColor(pctVal);
+
+    const textClass = color === 'silver' ? 'text-slate-400' : 'text-amber-400';
+    const fillClass = color === 'silver' ? 'fill-slate-400' : 'fill-amber-400';
 
     return (
       <div className="flex items-center gap-1.5 font-sans">
-        <div className="flex gap-0.5 text-amber-400">
+        <div className={`flex gap-0.5 ${textClass}`}>
           {Array.from({ length: 5 }).map((_, i) => {
-            const isFilled = i < Math.floor(starsCount);
-            const isHalf = !isFilled && (starsCount - i >= 0.5);
+            const isFilled = i < Math.floor(stars);
+            const isHalf = !isFilled && (stars - i >= 0.5);
             return (
               <div key={i} className="relative w-3.5 h-3.5 flex items-center justify-center">
                 <Star 
@@ -499,13 +923,13 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                 />
                 {isFilled && (
                   <Star 
-                    className="w-3.5 h-3.5 fill-amber-400 text-amber-400 absolute" 
+                    className={`w-3.5 h-3.5 ${fillClass} ${textClass} absolute`} 
                   />
                 )}
                 {isHalf && (
                   <div className="absolute top-0 left-0 w-1/2 overflow-hidden h-3.5">
                     <Star 
-                      className="w-3.5 h-3.5 fill-amber-400 text-amber-400 absolute top-0 left-0" 
+                      className={`w-3.5 h-3.5 ${fillClass} ${textClass} absolute top-0 left-0`} 
                       style={{ minWidth: '14px', width: '14px' }}
                     />
                   </div>
@@ -649,7 +1073,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-500" />
@@ -695,180 +1119,62 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
 
         {/* Years of contract filter */}
         <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg px-2">
-          <span className="text-[10px] uppercase font-bold text-slate-500 font-sans whitespace-nowrap">Años Contrato:</span>
+          <span className="text-[10px] uppercase font-bold text-slate-500 font-sans whitespace-nowrap">Contrato:</span>
           <select
             value={contractYearsFilter}
             onChange={(e) => setContractYearsFilter(e.target.value)}
             className="w-full bg-transparent border-0 text-xs py-1.5 text-slate-200 focus:outline-none focus:ring-0 cursor-pointer font-sans"
           >
             <option value="ALL" className="bg-slate-900">Todos</option>
-            <option value="0" className="bg-slate-900">0 años</option>
-            <option value="1" className="bg-slate-900">1 año</option>
+            <option value="1_or_less" className="bg-slate-900">1 año o menos</option>
             <option value="2" className="bg-slate-900">2 años</option>
             <option value="3" className="bg-slate-900">3 años</option>
-            <option value="4" className="bg-slate-900">4 años</option>
-            <option value="5" className="bg-slate-900 font-sans">5 años o más</option>
+            <option value="4_or_more" className="bg-slate-900 font-sans">4 o más años</option>
+          </select>
+        </div>
+
+        {/* Min Age Filter */}
+        <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg px-2">
+          <span className="text-[10px] uppercase font-bold text-slate-500 font-sans whitespace-nowrap">Edad Mín:</span>
+          <select
+            value={minAgeFilter}
+            onChange={(e) => setMinAgeFilter(e.target.value)}
+            className="w-full bg-transparent border-0 text-xs py-1.5 text-slate-200 focus:outline-none focus:ring-0 cursor-pointer font-sans"
+          >
+            <option value="" className="bg-slate-900">Todos</option>
+            {Array.from({ length: 32 }, (_, i) => i + 14).map(age => (
+              <option key={age} value={age.toString()} className="bg-slate-900">{age} años</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Max Age Filter */}
+        <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg px-2">
+          <span className="text-[10px] uppercase font-bold text-slate-500 font-sans whitespace-nowrap">Edad Máx:</span>
+          <select
+            value={maxAgeFilter}
+            onChange={(e) => setMaxAgeFilter(e.target.value)}
+            className="w-full bg-transparent border-0 text-xs py-1.5 text-slate-200 focus:outline-none focus:ring-0 cursor-pointer font-sans"
+          >
+            <option value="" className="bg-slate-900">Todos</option>
+            {Array.from({ length: 32 }, (_, i) => i + 14).map(age => (
+              <option key={age} value={age.toString()} className="bg-slate-900">{age} años</option>
+            ))}
           </select>
         </div>
       </div>
 
       {/* Adding form */}
       {isAdding && (
-        <div className="bg-slate-900 border border-emerald-500/30 p-4 rounded-xl space-y-3">
-          <h3 className="text-xs font-bold text-emerald-400 font-sans uppercase tracking-wider border-b border-slate-800 pb-1">
-            🆕 Registrar Nuevo Jugador en el Plantel
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-xs">
-            <div>
-              <label className="text-[10px] text-slate-400">ID Único (FMRD)</label>
-              <input
-                type="text"
-                placeholder="Opcional"
-                value={customId}
-                onChange={(e) => setCustomId(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 font-mono"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-slate-400">Primer Nombre</label>
-              <input
-                type="text"
-                placeholder="Ej. Lionel"
-                value={newFirstName}
-                onChange={(e) => setNewFirstName(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-slate-400">Apellido</label>
-              <input
-                type="text"
-                placeholder="Ej. Messi"
-                value={newLastName}
-                onChange={(e) => setNewLastName(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 font-semibold"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-slate-400">Posición Principal</label>
-              <select
-                value={newPlayer.position}
-                onChange={(e) => setNewPlayer({ ...newPlayer, position: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 cursor-pointer font-bold text-emerald-400"
-              >
-                {positionsList.filter(p => p !== 'ALL').map(p => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] text-slate-400">Edad</label>
-              <input
-                type="number"
-                min="14"
-                max="50"
-                value={newPlayer.age}
-                onChange={(e) => setNewPlayer({ ...newPlayer, age: parseInt(e.target.value) || 18 })}
-                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100"
-              />
-            </div>
+        <div className="bg-slate-900 border border-emerald-500/30 p-5 rounded-xl space-y-4">
+          <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+            <h3 className="text-xs font-bold text-emerald-400 font-sans uppercase tracking-wider">
+              🆕 Registrar Nuevo Jugador en el Plantel
+            </h3>
+            <span className="text-[9px] text-slate-500 font-mono">Todos los campos con (*) son obligatorios</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
-            <div>
-              <label className="text-[10px] text-slate-400">Nacionalidad</label>
-              <input
-                type="text"
-                placeholder="Ej. Argentina"
-                value={newPlayer.nationality}
-                onChange={(e) => setNewPlayer({ ...newPlayer, nationality: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-slate-400">Club Actual</label>
-              <input
-                type="text"
-                placeholder="Ej. Galatasaray"
-                value={clubInput}
-                onChange={(e) => setClubInput(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-slate-400">Valor de Mercado</label>
-              <input
-                type="text"
-                placeholder="Ej. €1.5M"
-                value={newPlayer.marketValue}
-                onChange={(e) => setNewPlayer({ ...newPlayer, marketValue: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 font-mono"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-slate-400 flex justify-between">
-                <span>Sueldo Anual (€)</span>
-                <span className="text-emerald-500 font-mono">Convertirá a sem.</span>
-              </label>
-              <input
-                type="text"
-                placeholder="Ej. 416000 o 416K"
-                value={newAnnualWageInput}
-                onChange={(e) => setNewAnnualWageInput(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 font-bold"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
-            <div>
-              <label className="text-[10px] text-slate-400">Fecha Fin Contrato</label>
-              <input
-                type="text"
-                placeholder="Ej. 30/6/2028"
-                value={contractEndInput}
-                onChange={(e) => setContractEndInput(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-slate-400">Fecha Nacimiento</label>
-              <input
-                type="text"
-                placeholder="Ej. 18/12/2001"
-                value={dateOfBirthInput}
-                onChange={(e) => setDateOfBirthInput(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-slate-400 flex justify-between">
-                <span>Calidad Actual (CA)</span>
-                <span className="text-slate-500 font-mono">0% - 100%</span>
-              </label>
-              <input
-                type="text"
-                placeholder="Ej. 75%"
-                value={newCaInput}
-                onChange={(e) => setNewCaInput(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 font-mono"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-slate-400 flex justify-between">
-                <span>Potencial (PA)</span>
-                <span className="text-slate-500 font-mono">0% - 100%</span>
-              </label>
-              <input
-                type="text"
-                placeholder="Ej. 90%"
-                value={newPaInput}
-                onChange={(e) => setNewPaInput(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 font-mono"
-              />
-            </div>
-          </div>
-
+          {/* Form Errors summary banner (if any) */}
           {formError && (
             <div className="bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs px-3 py-2 rounded-lg flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -876,20 +1182,384 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
             </div>
           )}
 
-          <div className="flex justify-end gap-2 text-xs">
-            <button
-              onClick={() => setIsAdding(false)}
-              className="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleCreatePlayer}
-              className="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
-            >
-              Confirmar Registro
-            </button>
-          </div>
+          {/* Real-time calculated errors */}
+          {(() => {
+            const errors = getFormErrors();
+            const hasErrors = Object.keys(errors).length > 0;
+            return (
+              <div className="space-y-4">
+                {/* ROW 1: ID Único, Nombre, Apellido, Posición, Edad */}
+                <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 text-xs">
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">ID Único (FMRD) *</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. 1201509"
+                      value={customId}
+                      onChange={(e) => setCustomId(e.target.value.replace(/\D/g, ''))}
+                      className={`w-full bg-slate-950 border rounded p-1.5 text-slate-100 font-mono focus:outline-none transition ${
+                        errors.customId ? 'border-rose-500 ring-1 ring-rose-500/20' : 'border-slate-800 focus:border-emerald-600'
+                      }`}
+                    />
+                    {errors.customId ? (
+                      <span className="text-[9px] text-rose-400 mt-0.5 block">{errors.customId}</span>
+                    ) : (
+                      <span className="text-[9px] text-slate-500 mt-0.5 block">Solo números enteros</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Primer Nombre *</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Lionel"
+                      value={newFirstName}
+                      onChange={(e) => setNewFirstName(e.target.value)}
+                      className={`w-full bg-slate-950 border rounded p-1.5 text-slate-100 focus:outline-none transition ${
+                        errors.newFirstName ? 'border-rose-500 ring-1 ring-rose-500/20' : 'border-slate-800 focus:border-emerald-600'
+                      }`}
+                    />
+                    {errors.newFirstName && (
+                      <span className="text-[9px] text-rose-400 mt-0.5 block">{errors.newFirstName}</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Apellido *</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Messi"
+                      value={newLastName}
+                      onChange={(e) => setNewLastName(e.target.value)}
+                      className={`w-full bg-slate-950 border rounded p-1.5 text-slate-100 font-semibold focus:outline-none transition ${
+                        errors.newLastName ? 'border-rose-500 ring-1 ring-rose-500/20' : 'border-slate-800 focus:border-emerald-600'
+                      }`}
+                    />
+                    {errors.newLastName && (
+                      <span className="text-[9px] text-rose-400 mt-0.5 block">{errors.newLastName}</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Posición Principal *</label>
+                    <select
+                      value={newPlayer.position}
+                      onChange={(e) => setNewPlayer({ ...newPlayer, position: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 cursor-pointer font-bold text-emerald-400 focus:outline-none focus:border-emerald-600"
+                    >
+                      {positionsList.filter(p => p !== 'ALL').map(p => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Edad (Autocalculada)</label>
+                    <div className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-300 font-bold font-mono">
+                      {(() => {
+                        const dobString = `${birthDay}/${birthMonth}/${birthYear}`;
+                        const ageVal = calculateAgeFromDOBPrecise(dobString, 18, gameDate);
+                        return `${ageVal} años`;
+                      })()}
+                    </div>
+                    <span className="text-[9px] text-slate-500 mt-0.5 block">Calculada de F. Nac.</span>
+                  </div>
+                </div>
+
+                {/* ROW 2: Primera Nacionalidad, Segunda Nacionalidad */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  {/* Primera Nacionalidad */}
+                  <div className="relative">
+                    <label className="text-[10px] text-slate-400 block mb-1">Primera Nacionalidad *</label>
+                    <div className="flex items-center gap-1.5 bg-slate-950 border rounded p-1 text-slate-100 focus-within:border-emerald-600 transition">
+                      <span className="pl-1 text-base">
+                        {fifaNations.find(n => n.name.toLowerCase() === nacionalidad1.trim().toLowerCase())?.flag || '🏳️'}
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="Ej. Argentina"
+                        value={nacionalidad1}
+                        onFocus={() => setShowNationsDropdown1(true)}
+                        onBlur={() => setTimeout(() => setShowNationsDropdown1(false), 200)}
+                        onChange={(e) => {
+                          setNacionalidad1(e.target.value);
+                          setShowNationsDropdown1(true);
+                        }}
+                        className="w-full bg-transparent border-0 text-slate-100 focus:outline-none p-0.5 text-xs"
+                      />
+                    </div>
+                    {errors.nacionalidad1 && (
+                      <span className="text-[9px] text-rose-400 mt-0.5 block">{errors.nacionalidad1}</span>
+                    )}
+
+                    {/* Autocomplete Dropdown */}
+                    {showNationsDropdown1 && (
+                      <div className="absolute z-50 left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-slate-950 border border-slate-800 rounded shadow-2xl divide-y divide-slate-900">
+                        {fifaNations
+                          .filter(n => n.name.toLowerCase().includes(nacionalidad1.toLowerCase()))
+                          .map(n => (
+                            <button
+                              key={n.name}
+                              type="button"
+                              onMouseDown={() => {
+                                setNacionalidad1(n.name);
+                                setShowNationsDropdown1(false);
+                              }}
+                              className="w-full text-left px-2.5 py-1.5 hover:bg-slate-900 flex items-center gap-2 text-xs text-slate-200 transition"
+                            >
+                              <span className="text-sm">{n.flag}</span>
+                              <span>{n.name}</span>
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Segunda Nacionalidad */}
+                  <div className="relative">
+                    <label className="text-[10px] text-slate-400 block mb-1">Segunda Nacionalidad (Opcional)</label>
+                    <div className="flex items-center gap-1.5 bg-slate-950 border rounded p-1 text-slate-100 focus-within:border-emerald-600 transition">
+                      <span className="pl-1 text-base">
+                        {fifaNations.find(n => n.name.toLowerCase() === nacionalidad2.trim().toLowerCase())?.flag || '🏳️'}
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="Ej. España (Opcional)"
+                        value={nacionalidad2}
+                        onFocus={() => setShowNationsDropdown2(true)}
+                        onBlur={() => setTimeout(() => setShowNationsDropdown2(false), 200)}
+                        onChange={(e) => {
+                          setNacionalidad2(e.target.value);
+                          setShowNationsDropdown2(true);
+                        }}
+                        className="w-full bg-transparent border-0 text-slate-100 focus:outline-none p-0.5 text-xs"
+                      />
+                    </div>
+                    {errors.nacionalidad2 && (
+                      <span className="text-[9px] text-rose-400 mt-0.5 block">{errors.nacionalidad2}</span>
+                    )}
+
+                    {/* Autocomplete Dropdown */}
+                    {showNationsDropdown2 && (
+                      <div className="absolute z-50 left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-slate-950 border border-slate-800 rounded shadow-2xl divide-y divide-slate-900">
+                        {fifaNations
+                          .filter(n => n.name.toLowerCase().includes(nacionalidad2.toLowerCase()))
+                          .map(n => (
+                            <button
+                              key={n.name}
+                              type="button"
+                              onMouseDown={() => {
+                                setNacionalidad2(n.name);
+                                setShowNationsDropdown2(false);
+                              }}
+                              className="w-full text-left px-2.5 py-1.5 hover:bg-slate-900 flex items-center gap-2 text-xs text-slate-200 transition"
+                            >
+                              <span className="text-sm">{n.flag}</span>
+                              <span>{n.name}</span>
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ROW 3: Valor de mercado, Sueldo anual */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Valor de Mercado (solo números) *</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. 1500000"
+                      value={newMarketValueInput}
+                      onChange={(e) => setNewMarketValueInput(e.target.value.replace(/\D/g, ''))}
+                      className={`w-full bg-slate-950 border rounded p-1.5 text-slate-100 font-mono focus:outline-none transition ${
+                        errors.marketValue ? 'border-rose-500 ring-1 ring-rose-500/20' : 'border-slate-800 focus:border-emerald-600'
+                      }`}
+                    />
+                    {errors.marketValue ? (
+                      <span className="text-[9px] text-rose-400 mt-0.5 block">{errors.marketValue}</span>
+                    ) : (
+                      <span className="text-[9px] text-emerald-400 font-mono mt-0.5 block">
+                        Vista previa: {formatMarketValue(parseInt(newMarketValueInput) || 0)}
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Sueldo Anual (€, solo números) *</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. 416000"
+                      value={newAnnualWageInput}
+                      onChange={(e) => setNewAnnualWageInput(e.target.value.replace(/\D/g, ''))}
+                      className={`w-full bg-slate-950 border rounded p-1.5 text-slate-100 font-mono focus:outline-none transition ${
+                        errors.annualWage ? 'border-rose-500 ring-1 ring-rose-500/20' : 'border-slate-800 focus:border-emerald-600'
+                      }`}
+                    />
+                    {errors.annualWage ? (
+                      <span className="text-[9px] text-rose-400 mt-0.5 block">{errors.annualWage}</span>
+                    ) : (
+                      <span className="text-[9px] text-emerald-400 font-mono mt-0.5 block">
+                        Equivale a: {formatWeeklyWage(parseAnnualWageInputToWeekly(newAnnualWageInput))}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* ROW 4: Fecha Fin Contrato, Fecha Nacimiento, CA, PA */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                  {/* Fecha Fin Contrato */}
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Fecha Fin Contrato *</label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        maxLength={2}
+                        placeholder="DD"
+                        value={contractEndDay}
+                        onChange={(e) => setContractEndDay(e.target.value.replace(/\D/g, ''))}
+                        className={`w-12 bg-slate-950 border rounded p-1 text-center font-mono text-slate-100 ${
+                          errors.contractEnd ? 'border-rose-500' : 'border-slate-800'
+                        }`}
+                      />
+                      <span className="text-slate-600">/</span>
+                      <input
+                        type="text"
+                        maxLength={2}
+                        placeholder="MM"
+                        value={contractEndMonth}
+                        onChange={(e) => setContractEndMonth(e.target.value.replace(/\D/g, ''))}
+                        className={`w-12 bg-slate-950 border rounded p-1 text-center font-mono text-slate-100 ${
+                          errors.contractEnd ? 'border-rose-500' : 'border-slate-800'
+                        }`}
+                      />
+                      <span className="text-slate-600">/</span>
+                      <input
+                        type="text"
+                        maxLength={4}
+                        placeholder="AAAA"
+                        value={contractEndYear}
+                        onChange={(e) => setContractEndYear(e.target.value.replace(/\D/g, ''))}
+                        className={`w-20 bg-slate-950 border rounded p-1 text-center font-mono text-slate-100 ${
+                          errors.contractEnd ? 'border-rose-500' : 'border-slate-800'
+                        }`}
+                      />
+                    </div>
+                    {errors.contractEnd ? (
+                      <span className="text-[9px] text-rose-400 mt-0.5 block">{errors.contractEnd}</span>
+                    ) : (
+                      <span className="text-[9px] text-slate-500 mt-0.5 block">Día / Mes / Año</span>
+                    )}
+                  </div>
+
+                  {/* Fecha Nacimiento */}
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Fecha Nacimiento *</label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        maxLength={2}
+                        placeholder="DD"
+                        value={birthDay}
+                        onChange={(e) => setBirthDay(e.target.value.replace(/\D/g, ''))}
+                        className={`w-12 bg-slate-950 border rounded p-1 text-center font-mono text-slate-100 ${
+                          errors.dateOfBirth ? 'border-rose-500' : 'border-slate-800'
+                        }`}
+                      />
+                      <span className="text-slate-600">/</span>
+                      <input
+                        type="text"
+                        maxLength={2}
+                        placeholder="MM"
+                        value={birthMonth}
+                        onChange={(e) => setBirthMonth(e.target.value.replace(/\D/g, ''))}
+                        className={`w-12 bg-slate-950 border rounded p-1 text-center font-mono text-slate-100 ${
+                          errors.dateOfBirth ? 'border-rose-500' : 'border-slate-800'
+                        }`}
+                      />
+                      <span className="text-slate-600">/</span>
+                      <input
+                        type="text"
+                        maxLength={4}
+                        placeholder="AAAA"
+                        value={birthYear}
+                        onChange={(e) => setBirthYear(e.target.value.replace(/\D/g, ''))}
+                        className={`w-20 bg-slate-950 border rounded p-1 text-center font-mono text-slate-100 ${
+                          errors.dateOfBirth ? 'border-rose-500' : 'border-slate-800'
+                        }`}
+                      />
+                    </div>
+                    {errors.dateOfBirth ? (
+                      <span className="text-[9px] text-rose-400 mt-0.5 block">{errors.dateOfBirth}</span>
+                    ) : (
+                      <span className="text-[9px] text-slate-500 mt-0.5 block">Día / Mes / Año</span>
+                    )}
+                  </div>
+
+                  {/* Calidad Actual */}
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Calidad Actual (CA) *</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. 3.5 o 3,5"
+                      value={newCaInput}
+                      onChange={(e) => setNewCaInput(e.target.value)}
+                      className={`w-full bg-slate-950 border rounded p-1.5 text-slate-100 font-mono focus:outline-none transition ${
+                        errors.currentAbility ? 'border-rose-500 ring-1 ring-rose-500/20' : 'border-slate-800 focus:border-emerald-600'
+                      }`}
+                    />
+                    {errors.currentAbility ? (
+                      <span className="text-[9px] text-rose-400 mt-0.5 block">{errors.currentAbility}</span>
+                    ) : (
+                      <span className="text-[9px] text-slate-500 mt-0.5 block">Nivel en estrellas (0-5) o 0-200</span>
+                    )}
+                  </div>
+
+                  {/* Potencial */}
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Calidad Potencial (PA) *</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. 4.5 o 4,5"
+                      value={newPaInput}
+                      onChange={(e) => setNewPaInput(e.target.value)}
+                      className={`w-full bg-slate-950 border rounded p-1.5 text-slate-100 font-mono focus:outline-none transition ${
+                        errors.potentialAbility ? 'border-rose-500 ring-1 ring-rose-500/20' : 'border-slate-800 focus:border-emerald-600'
+                      }`}
+                    />
+                    {errors.potentialAbility ? (
+                      <span className="text-[9px] text-rose-400 mt-0.5 block">{errors.potentialAbility}</span>
+                    ) : (
+                      <span className="text-[9px] text-slate-500 mt-0.5 block">Nivel en estrellas (0-5) o 0-200</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Confirm buttons */}
+                <div className="flex justify-end gap-2 text-xs pt-2 border-t border-slate-800/60">
+                  <button
+                    type="button"
+                    onClick={() => setIsAdding(false)}
+                    className="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold transition"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={hasErrors}
+                    onClick={handleCreatePlayer}
+                    className={`px-4 py-1.5 rounded font-semibold transition ${
+                      hasErrors
+                        ? 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50 border border-slate-700/50'
+                        : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                    }`}
+                  >
+                    Confirmar Registro
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -918,12 +1588,24 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
               <div>
-                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Nombre</label>
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Primer Nombre</label>
                 <input
                   type="text"
-                  value={editingPlayer.name}
-                  onChange={(e) => setEditingPlayer({ ...editingPlayer, name: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1"
+                  placeholder="Ej. Lionel"
+                  value={editFirstName}
+                  onChange={(e) => setEditFirstName(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1 focus:outline-none focus:border-emerald-600"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Apellido *</label>
+                <input
+                  type="text"
+                  placeholder="Ej. Messi"
+                  value={editLastName}
+                  onChange={(e) => setEditLastName(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1 focus:outline-none focus:border-emerald-600"
                 />
               </div>
 
@@ -932,7 +1614,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                 <select
                   value={editingPlayer.position}
                   onChange={(e) => setEditingPlayer({ ...editingPlayer, position: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1 cursor-pointer"
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1 cursor-pointer focus:outline-none focus:border-emerald-600"
                 >
                   {positionsList.filter(p => p !== 'ALL').map(p => (
                     <option key={p} value={p}>{p}</option>
@@ -941,23 +1623,98 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
               </div>
 
               <div>
-                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Edad</label>
-                <input
-                  type="number"
-                  value={editingPlayer.age}
-                  onChange={(e) => setEditingPlayer({ ...editingPlayer, age: parseInt(e.target.value) || editingPlayer.age })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1"
-                />
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans block mb-1">Edad (Autocalculada)</label>
+                <div className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-300 font-bold font-mono mt-1">
+                  {(() => {
+                    const dobString = `${editBirthDay}/${editBirthMonth}/${editBirthYear}`;
+                    const ageVal = calculateAgeFromDOBPrecise(dobString, editingPlayer.age, gameDate);
+                    return `${ageVal} años`;
+                  })()}
+                </div>
               </div>
 
-              <div>
-                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Nacionalidad</label>
-                <input
-                  type="text"
-                  value={editingPlayer.nationality}
-                  onChange={(e) => setEditingPlayer({ ...editingPlayer, nationality: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1"
-                />
+              {/* Primera Nacionalidad Autocomplete */}
+              <div className="relative">
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Primera Nacionalidad *</label>
+                <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1 focus-within:border-emerald-600 transition">
+                  <span className="text-base leading-none">
+                    {fifaNations.find(n => n.name.toLowerCase() === editNacionalidad1.trim().toLowerCase())?.flag || '🏳️'}
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Ej. Argentina"
+                    value={editNacionalidad1}
+                    onFocus={() => setShowEditNationsDropdown1(true)}
+                    onBlur={() => setTimeout(() => setShowEditNationsDropdown1(false), 200)}
+                    onChange={(e) => {
+                      setEditNacionalidad1(e.target.value);
+                      setShowEditNationsDropdown1(true);
+                    }}
+                    className="w-full bg-transparent border-0 text-slate-100 focus:outline-none p-0.5"
+                  />
+                </div>
+                {showEditNationsDropdown1 && (
+                  <div className="absolute left-0 right-0 z-50 mt-1 max-h-40 overflow-y-auto bg-slate-950 border border-slate-800 rounded-lg shadow-xl font-mono text-[11px]">
+                    {fifaNations
+                      .filter(n => n.name.toLowerCase().includes(editNacionalidad1.toLowerCase()))
+                      .map(n => (
+                        <button
+                          key={n.name}
+                          type="button"
+                          onMouseDown={() => {
+                            setEditNacionalidad1(n.name);
+                            setShowEditNationsDropdown1(false);
+                          }}
+                          className="w-full text-left px-3 py-1.5 hover:bg-slate-800/80 text-slate-300 flex items-center gap-2"
+                        >
+                          <span>{n.flag}</span>
+                          <span>{n.name}</span>
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Segunda Nacionalidad Autocomplete */}
+              <div className="relative">
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Segunda Nacionalidad (Opcional)</label>
+                <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1 focus-within:border-emerald-600 transition">
+                  <span className="text-base leading-none">
+                    {fifaNations.find(n => n.name.toLowerCase() === editNacionalidad2.trim().toLowerCase())?.flag || '🏳️'}
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Ej. España"
+                    value={editNacionalidad2}
+                    onFocus={() => setShowEditNationsDropdown2(true)}
+                    onBlur={() => setTimeout(() => setShowEditNationsDropdown2(false), 200)}
+                    onChange={(e) => {
+                      setEditNacionalidad2(e.target.value);
+                      setShowEditNationsDropdown2(true);
+                    }}
+                    className="w-full bg-transparent border-0 text-slate-100 focus:outline-none p-0.5"
+                  />
+                </div>
+                {showEditNationsDropdown2 && (
+                  <div className="absolute left-0 right-0 z-50 mt-1 max-h-40 overflow-y-auto bg-slate-950 border border-slate-800 rounded-lg shadow-xl font-mono text-[11px]">
+                    {fifaNations
+                      .filter(n => n.name.toLowerCase().includes(editNacionalidad2.toLowerCase()))
+                      .map(n => (
+                        <button
+                          key={n.name}
+                          type="button"
+                          onMouseDown={() => {
+                            setEditNacionalidad2(n.name);
+                            setShowEditNationsDropdown2(false);
+                          }}
+                          className="w-full text-left px-3 py-1.5 hover:bg-slate-800/80 text-slate-300 flex items-center gap-2"
+                        >
+                          <span>{n.flag}</span>
+                          <span>{n.name}</span>
+                        </button>
+                      ))}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -966,73 +1723,135 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                   type="text"
                   value={editingPlayer.club || ''}
                   onChange={(e) => setEditingPlayer({ ...editingPlayer, club: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1"
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1 focus:outline-none focus:border-emerald-600"
                 />
               </div>
 
+              {/* Sueldo Anual Numeric-Only input */}
               <div>
-                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Sueldo semanal</label>
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Sueldo Anual (€) *</label>
                 <input
                   type="text"
-                  value={editingPlayer.wage}
-                  onChange={(e) => setEditingPlayer({ ...editingPlayer, wage: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1"
+                  placeholder="Ej. 416000"
+                  value={editAnnualWageInput}
+                  onChange={(e) => setEditAnnualWageInput(e.target.value.replace(/\D/g, ''))}
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 font-mono mt-1 focus:outline-none focus:border-emerald-600"
                 />
+                <span className="text-[9px] text-emerald-400 font-mono mt-0.5 block">
+                  Equivale a: {formatWeeklyWage(parseAnnualWageInputToWeekly(editAnnualWageInput))}
+                </span>
               </div>
 
+              {/* Valor de Mercado Numeric-Only input */}
               <div>
-                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Valor de mercado</label>
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Valor de Mercado *</label>
                 <input
                   type="text"
-                  value={editingPlayer.marketValue}
-                  onChange={(e) => setEditingPlayer({ ...editingPlayer, marketValue: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1"
+                  placeholder="Ej. 1500000"
+                  value={editMarketValueInput}
+                  onChange={(e) => setEditMarketValueInput(e.target.value.replace(/\D/g, ''))}
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 font-mono mt-1 focus:outline-none focus:border-emerald-600"
                 />
+                <span className="text-[9px] text-emerald-400 font-mono mt-0.5 block">
+                  Vista previa: {formatMarketValue(parseInt(editMarketValueInput) || 0)}
+                </span>
               </div>
 
+              {/* Fecha Fin Contrato precise inputs */}
               <div>
-                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Fecha Fin Contrato</label>
-                <input
-                  type="text"
-                  value={editingPlayer.contractEnd || ''}
-                  onChange={(e) => setEditingPlayer({ ...editingPlayer, contractEnd: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1"
-                />
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans block mb-1">Fecha Fin Contrato *</label>
+                <div className="flex items-center gap-1 mt-1">
+                  <input
+                    type="text"
+                    maxLength={2}
+                    placeholder="DD"
+                    value={editContractDay}
+                    onChange={(e) => setEditContractDay(e.target.value.replace(/\D/g, ''))}
+                    className="w-12 bg-slate-950 border border-slate-800 rounded p-1.5 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
+                  />
+                  <span className="text-slate-600">/</span>
+                  <input
+                    type="text"
+                    maxLength={2}
+                    placeholder="MM"
+                    value={editContractMonth}
+                    onChange={(e) => setEditContractMonth(e.target.value.replace(/\D/g, ''))}
+                    className="w-12 bg-slate-950 border border-slate-800 rounded p-1.5 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
+                  />
+                  <span className="text-slate-600">/</span>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    placeholder="AAAA"
+                    value={editContractYear}
+                    onChange={(e) => setEditContractYear(e.target.value.replace(/\D/g, ''))}
+                    className="w-20 bg-slate-950 border border-slate-800 rounded p-1.5 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+                <span className="text-[9px] text-slate-500 mt-0.5 block">Día / Mes / Año</span>
               </div>
 
+              {/* Fecha de Nacimiento precise inputs */}
               <div>
-                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Fecha de Nacimiento</label>
-                <input
-                  type="text"
-                  value={editingPlayer.dateOfBirth || ''}
-                  onChange={(e) => setEditingPlayer({ ...editingPlayer, dateOfBirth: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1"
-                />
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans block mb-1">Fecha de Nacimiento *</label>
+                <div className="flex items-center gap-1 mt-1">
+                  <input
+                    type="text"
+                    maxLength={2}
+                    placeholder="DD"
+                    value={editBirthDay}
+                    onChange={(e) => setEditBirthDay(e.target.value.replace(/\D/g, ''))}
+                    className="w-12 bg-slate-950 border border-slate-800 rounded p-1.5 text-center font-mono text-slate-100 focus:outline-none"
+                  />
+                  <span className="text-slate-600">/</span>
+                  <input
+                    type="text"
+                    maxLength={2}
+                    placeholder="MM"
+                    value={editBirthMonth}
+                    onChange={(e) => setEditBirthMonth(e.target.value.replace(/\D/g, ''))}
+                    className="w-12 bg-slate-950 border border-slate-800 rounded p-1.5 text-center font-mono text-slate-100 focus:outline-none"
+                  />
+                  <span className="text-slate-600">/</span>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    placeholder="AAAA"
+                    value={editBirthYear}
+                    onChange={(e) => setEditBirthYear(e.target.value.replace(/\D/g, ''))}
+                    className="w-20 bg-slate-950 border border-slate-800 rounded p-1.5 text-center font-mono text-slate-100 focus:outline-none"
+                  />
+                </div>
+                <span className="text-[9px] text-slate-500 mt-0.5 block">Día / Mes / Año</span>
               </div>
 
+              {/* CA Float-only input */}
               <div>
                 <label className="text-[10px] uppercase font-bold text-slate-400 font-sans flex justify-between">
-                  <span>Calidad Actual (CA)</span>
-                  <span className="text-slate-500 font-mono">0% - 100%</span>
+                  <span>Calidad Actual (CA) *</span>
+                  <span className="text-slate-500 font-mono">0.0 - 5.0 (o 0-200)</span>
                 </label>
                 <input
                   type="text"
+                  placeholder="Ej. 3.5 o 3,5"
                   value={editCaInput}
-                  onChange={(e) => setEditCaInput(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 font-mono mt-1"
+                  onChange={(e) => setEditCaInput(e.target.value.replace(/[^0-9.,]/g, ''))}
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 font-mono mt-1 focus:outline-none focus:border-emerald-600"
                 />
               </div>
 
+              {/* PA Float-only input */}
               <div>
                 <label className="text-[10px] uppercase font-bold text-slate-400 font-sans flex justify-between">
-                  <span>Calidad Potencial (PA)</span>
-                  <span className="text-slate-500 font-mono">0% - 100%</span>
+                  <span>Calidad Potencial (PA) *</span>
+                  <span className="text-slate-500 font-mono">0.0 - 5.0 (o 0-200)</span>
                 </label>
                 <input
                   type="text"
+                  placeholder="Ej. 4.5 o 4,5"
                   value={editPaInput}
-                  onChange={(e) => setEditPaInput(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 font-mono mt-1"
+                  onChange={(e) => setEditPaInput(e.target.value.replace(/[^0-9.,]/g, ''))}
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 font-mono mt-1 focus:outline-none focus:border-emerald-600"
                 />
               </div>
 
@@ -1041,7 +1860,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                 <select
                   value={editingPlayer.squadStatus}
                   onChange={(e) => setEditingPlayer({ ...editingPlayer, squadStatus: e.target.value as Player['squadStatus'] })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1 cursor-pointer"
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1 cursor-pointer focus:outline-none focus:border-emerald-600"
                 >
                   <option value="no_asignado">⚪ Sin Asignar / Reserva</option>
                   <option value="titular">🟢 Planificado Titular</option>
@@ -1063,14 +1882,35 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                     📋 Información de la Baja / Venta
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-400">Año de Baja</label>
-                    <input
-                      type="text"
-                      placeholder="Ej. 2026"
-                      value={editingPlayer.fechaBaja || ''}
-                      onChange={(e) => setEditingPlayer({ ...editingPlayer, fechaBaja: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 mt-1 focus:border-rose-500 focus:outline-none"
-                    />
+                    <label className="text-[10px] text-slate-400">Fecha de Baja (DD/MM/AAAA)</label>
+                    <div className="flex items-center gap-1 mt-1">
+                      <input
+                        type="text"
+                        maxLength={2}
+                        placeholder="DD"
+                        value={editBajaDay}
+                        onChange={(e) => setEditBajaDay(e.target.value.replace(/\D/g, ''))}
+                        className="w-12 bg-slate-950 border border-slate-800 rounded p-1.5 text-center font-mono text-slate-100 focus:border-rose-500 focus:outline-none"
+                      />
+                      <span className="text-slate-600">/</span>
+                      <input
+                        type="text"
+                        maxLength={2}
+                        placeholder="MM"
+                        value={editBajaMonth}
+                        onChange={(e) => setEditBajaMonth(e.target.value.replace(/\D/g, ''))}
+                        className="w-12 bg-slate-950 border border-slate-800 rounded p-1.5 text-center font-mono text-slate-100 focus:border-rose-500 focus:outline-none"
+                      />
+                      <span className="text-slate-600">/</span>
+                      <input
+                        type="text"
+                        maxLength={4}
+                        placeholder="AAAA"
+                        value={editBajaYear}
+                        onChange={(e) => setEditBajaYear(e.target.value.replace(/\D/g, ''))}
+                        className="w-20 bg-slate-950 border border-slate-800 rounded p-1.5 text-center font-mono text-slate-100 focus:border-rose-500 focus:outline-none"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="text-[10px] text-slate-400">Monto (€)</label>
@@ -1121,14 +1961,35 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-400">Año fin de Préstamo</label>
-                    <input
-                      type="text"
-                      placeholder="Ej. 2027"
-                      value={editingPlayer.finPrestamo || ''}
-                      onChange={(e) => setEditingPlayer({ ...editingPlayer, finPrestamo: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 mt-1 focus:border-blue-500 focus:outline-none"
-                    />
+                    <label className="text-[10px] text-slate-400">Fin de Préstamo (DD/MM/AAAA)</label>
+                    <div className="flex items-center gap-1 mt-1">
+                      <input
+                        type="text"
+                        maxLength={2}
+                        placeholder="DD"
+                        value={editPrestamoDay}
+                        onChange={(e) => setEditPrestamoDay(e.target.value.replace(/\D/g, ''))}
+                        className="w-12 bg-slate-950 border border-slate-800 rounded p-1.5 text-center font-mono text-slate-100 focus:border-blue-500 focus:outline-none"
+                      />
+                      <span className="text-slate-600">/</span>
+                      <input
+                        type="text"
+                        maxLength={2}
+                        placeholder="MM"
+                        value={editPrestamoMonth}
+                        onChange={(e) => setEditPrestamoMonth(e.target.value.replace(/\D/g, ''))}
+                        className="w-12 bg-slate-950 border border-slate-800 rounded p-1.5 text-center font-mono text-slate-100 focus:border-blue-500 focus:outline-none"
+                      />
+                      <span className="text-slate-600">/</span>
+                      <input
+                        type="text"
+                        maxLength={4}
+                        placeholder="AAAA"
+                        value={editPrestamoYear}
+                        onChange={(e) => setEditPrestamoYear(e.target.value.replace(/\D/g, ''))}
+                        className="w-20 bg-slate-950 border border-slate-800 rounded p-1.5 text-center font-mono text-slate-100 focus:border-blue-500 focus:outline-none"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="text-[10px] text-slate-400">Opción de Compra</label>
@@ -1581,7 +2442,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                   <th className="px-3 py-2.5 font-semibold">Potencial (PA)</th>
                   <th className="px-3 py-2.5 font-semibold">Fin Contrato</th>
                   <th className="px-3 py-2.5 font-semibold">Club Destino de Préstamo</th>
-                  <th className="px-3 py-2.5 font-semibold">Fin de Préstamo (Año)</th>
+                  <th className="px-3 py-2.5 font-semibold">Fin de Préstamo (DD/MM/AAAA)</th>
                   <th className="px-3 py-2.5 font-semibold">Opción de Compra</th>
                   <th className="px-3 py-2.5 font-semibold text-right">Acciones</th>
                 </tr>
@@ -1621,10 +2482,10 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                     <td className="px-3 py-2">
                       <input
                         type="text"
-                        placeholder="Ej. 2027"
+                        placeholder="Ej. 30/06/2027"
                         value={p.finPrestamo || ''}
                         onChange={(e) => onUpdatePlayer({ ...p, finPrestamo: e.target.value })}
-                        className="bg-slate-950 border border-slate-850 rounded px-2 py-1 text-xs text-slate-100 w-20 text-center focus:border-blue-500 focus:outline-none"
+                        className="bg-slate-950 border border-slate-850 rounded px-2 py-1 text-xs text-slate-100 w-28 text-center focus:border-blue-500 focus:outline-none font-mono"
                       />
                     </td>
                     <td className="px-3 py-2">
@@ -1717,7 +2578,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                   <th className="px-3 py-2.5 font-semibold">ID</th>
                   <th className="px-3 py-2.5 font-semibold">Jugador</th>
                   <th className="px-3 py-2.5 font-semibold">Nacionalidad</th>
-                  <th className="px-3 py-2.5 font-semibold">Fecha de Baja (Año)</th>
+                  <th className="px-3 py-2.5 font-semibold">Fecha de Baja (DD/MM/AAAA)</th>
                   <th className="px-3 py-2.5 font-semibold">Monto de Salida</th>
                   <th className="px-3 py-2.5 font-semibold">Club Destino</th>
                   <th className="px-3 py-2.5 font-semibold">Comentarios / Notas de Baja</th>
@@ -1741,10 +2602,10 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                     <td className="px-3 py-2">
                       <input
                         type="text"
-                        placeholder="Ej. 2026"
+                        placeholder="Ej. 30/06/2026"
                         value={p.fechaBaja || ''}
                         onChange={(e) => onUpdatePlayer({ ...p, fechaBaja: e.target.value })}
-                        className="bg-slate-950 border border-slate-850 rounded px-2 py-1 text-xs text-slate-100 w-20 text-center focus:border-rose-500 focus:outline-none"
+                        className="bg-slate-950 border border-slate-850 rounded px-2 py-1 text-xs text-slate-100 w-28 text-center focus:border-rose-500 focus:outline-none font-mono"
                       />
                     </td>
                     <td className="px-3 py-2">

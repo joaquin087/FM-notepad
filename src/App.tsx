@@ -105,6 +105,40 @@ export default function App() {
     setIsEditingYear(false);
   };
 
+  const monthsList = [
+    { value: 1, label: 'Enero' },
+    { value: 2, label: 'Febrero' },
+    { value: 3, label: 'Marzo' },
+    { value: 4, label: 'Abril' },
+    { value: 5, label: 'Mayo' },
+    { value: 6, label: 'Junio' },
+    { value: 7, label: 'Julio' },
+    { value: 8, label: 'Agosto' },
+    { value: 9, label: 'Septiembre' },
+    { value: 10, label: 'Octubre' },
+    { value: 11, label: 'Noviembre' },
+    { value: 12, label: 'Diciembre' },
+  ];
+
+  const getGameMonth = (): number => {
+    const parts = gameDate.split(/[\.\-\/]+/);
+    if (parts.length === 3) {
+      const month = parseInt(parts[1], 10);
+      if (!isNaN(month) && month >= 1 && month <= 12) {
+        return month;
+      }
+    }
+    return 6; // default to June (06)
+  };
+
+  const updateGameMonth = (month: number) => {
+    const parts = gameDate.split(/[\.\-\/]+/);
+    const day = parts.length === 3 ? parts[0] : '30';
+    const year = parts.length === 3 ? parts[2] : String(gameYear);
+    const formattedMonth = String(month).padStart(2, '0');
+    setGameDate(`${day}/${formattedMonth}/${year}`);
+  };
+
   const [activeTab, setActiveTab] = useState<'squad_pitch' | 'players_list' | 'clipboard_import' | 'stats' | 'progression_tracker' | 'planning_grid'>('planning_grid');
   const [selectedPosition, setSelectedPosition] = useState<PitchPosition | null>(null);
   const [candidateSearch, setCandidateSearch] = useState('');
@@ -627,6 +661,7 @@ export default function App() {
 
         {/* Quick Info Badges in Sophisticated Dark Pill style */}
         <div className="flex flex-wrap items-center gap-2 text-xs font-sans w-full md:w-auto justify-end">
+          {/* Year Selector */}
           <div className="flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-full px-2 py-0.5 text-slate-300 select-none">
             <span className="text-[10px] uppercase font-bold text-slate-400 font-mono px-1">Año:</span>
             <button
@@ -668,6 +703,23 @@ export default function App() {
             >
               +
             </button>
+          </div>
+
+          {/* Month Selector */}
+          <div className="flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-full px-2 py-0.5 text-slate-300 select-none">
+            <span className="text-[10px] uppercase font-bold text-slate-400 font-mono px-1">Mes:</span>
+            <select
+              value={getGameMonth()}
+              onChange={(e) => updateGameMonth(parseInt(e.target.value, 10))}
+              className="bg-transparent border-0 text-[11px] font-mono text-white font-semibold focus:outline-none focus:ring-0 cursor-pointer pr-4 py-0"
+              style={{ WebkitAppearance: 'none', MozAppearance: 'none', appearance: 'none' }}
+            >
+              {monthsList.map((m) => (
+                <option key={m.value} value={m.value} className="bg-slate-900 text-slate-200 text-xs">
+                  {m.label}
+                </option>
+              ))}
+            </select>
           </div>
           <span className="px-3 py-1 bg-slate-800 rounded-full text-xs font-medium border border-slate-700 text-slate-300">
             Total: <strong className="text-white font-semibold font-sans">{totalPlayers} Jugadores</strong>

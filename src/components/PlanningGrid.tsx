@@ -144,9 +144,9 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, ga
     );
   };
 
-  // Active players (excluding those who are Bajas)
+  // Active players (excluding those who are Bajas or Cedidos)
   const activePlayers = useMemo(() => {
-    return players.filter(p => p.squadStatus !== 'baja');
+    return players.filter(p => p.squadStatus !== 'baja' && p.squadStatus !== 'cedidos');
   }, [players]);
 
   // Group players by assigned position and status for instant O(1) grid queries
@@ -290,14 +290,69 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, ga
         </div>
       </div>
 
-      {/* Main Grid Structure and sidebar container */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+      {/* SECTION: JUGADORES SIN CLASIFICAR */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+        <div className="p-4 bg-slate-850 border-b border-slate-800 flex justify-between items-center">
+          <div>
+            <h3 className="text-xs font-bold text-white flex items-center gap-1.5 uppercase font-mono">
+              <UserMinus className="w-3.5 h-3.5 text-slate-400" /> Jugadores Sin Clasificar ({unassignedPlayers.length})
+            </h3>
+            <p className="text-[10px] text-slate-500 mt-0.5">Jugadores cargados en el plantel que aún no han sido asignados a ninguna posición en la matriz táctica.</p>
+          </div>
+        </div>
+
+        <div className="p-4">
+          {unassignedPlayers.length === 0 ? (
+            <div className="p-4 text-center text-xs text-slate-500 italic">
+              ¡Todos los jugadores están asignados en la matriz táctica!
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {unassignedPlayers.map(p => {
+                const autoCol = getAutoColumn(p.position);
+                return (
+                  <div
+                    key={p.id}
+                    className="p-3 bg-slate-950 hover:bg-slate-850/50 rounded-xl border border-slate-850 hover:border-slate-800 transition flex flex-col justify-between gap-2.5 text-xs relative group"
+                  >
+                    <div className="truncate">
+                      <div className="font-bold text-white truncate text-xs" title={p.name}>{p.name}</div>
+                      <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1 mt-0.5">
+                        <span className="text-emerald-400 font-bold">{p.position}</span>
+                        <span>•</span>
+                        <span>{calculateAgeFromDOB(p.dateOfBirth, p.age, gameYear)} años</span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-1 mt-1">
+                      <button
+                        onClick={() => handleAssignToCell(p, 'recambio', autoCol)}
+                        className="flex-1 py-1 bg-emerald-950/30 hover:bg-emerald-800/80 text-emerald-400 hover:text-white border border-emerald-900/40 rounded-lg text-[9px] font-mono font-bold transition flex items-center justify-center gap-0.5"
+                        title={`Alinear automáticamente a Recambio / columna ${autoCol}`}
+                      >
+                        Alinear
+                      </button>
+                      <button
+                        onClick={() => setSelectedPlayer(p)}
+                        className="p-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-lg text-slate-400 hover:text-white transition flex items-center justify-center"
+                        title="Ubicar de forma manual"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* SQUAD PLANNING BOARD GRID (Full Width) */}
+      <div className="w-full bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
         
-        {/* SQUAD PLANNING BOARD GRID (Left, 9 cols) */}
-        <div className="xl:col-span-9 bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
-          
-          {/* Scrollable Matrix Table */}
-          <div className="overflow-x-auto">
+        {/* Scrollable Matrix Table */}
+        <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left min-w-[1300px]">
               
               {/* Header row containing Positions */}
@@ -429,99 +484,6 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, ga
           </div>
 
         </div>
-
-        {/* UNASSIGNED PLAYERS SIDEBAR (Right, 3 cols) */}
-        <div className="xl:col-span-3 space-y-4">
-          
-          {/* Quick Stats Widget */}
-          <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-            <h3 className="text-xs font-bold uppercase tracking-wider font-mono text-slate-400 mb-2.5">
-              Balance General
-            </h3>
-            <div className="grid grid-cols-2 gap-2 text-center">
-              <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-850">
-                <span className="text-[9px] text-slate-500 block uppercase font-mono">Titulares</span>
-                <span className="text-base font-bold text-emerald-400 font-sans">
-                  {activePlayers.filter(p => p.squadStatus === 'titular').length}
-                </span>
-                <span className="text-[9px] text-slate-500 block">/ 11 de gala</span>
-              </div>
-              <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-850">
-                <span className="text-[9px] text-slate-500 block uppercase font-mono">Suplentes</span>
-                <span className="text-base font-bold text-amber-400 font-sans">
-                  {activePlayers.filter(p => p.squadStatus === 'suplente').length}
-                </span>
-                <span className="text-[9px] text-slate-500 block">en el banco</span>
-              </div>
-            </div>
-          </div>
-
-          {/* List of Players "Sin Clasificar" */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col max-h-[500px]">
-            <div className="p-3.5 bg-slate-850 border-b border-slate-800 flex justify-between items-center">
-              <div>
-                <h3 className="text-xs font-bold text-white flex items-center gap-1.5 uppercase font-mono">
-                  <UserMinus className="w-3.5 h-3.5 text-slate-400" /> Sin Clasificar ({unassignedPlayers.length})
-                </h3>
-                <p className="text-[10px] text-slate-500 mt-0.5">Usa estos jugadores para llenar la cuadrícula.</p>
-              </div>
-            </div>
-
-            {/* List scroll container */}
-            <div className="p-2 overflow-y-auto divide-y divide-slate-850">
-              {unassignedPlayers.length === 0 ? (
-                <div className="p-6 text-center text-[11px] text-slate-500 italic">
-                  ¡Todos los jugadores están asignados en la matriz!
-                </div>
-              ) : (
-                unassignedPlayers.map(p => {
-                  const autoCol = getAutoColumn(p.position);
-                  return (
-                    <div 
-                      key={p.id}
-                      className="p-2 hover:bg-slate-850/50 rounded-lg flex items-center justify-between gap-2 group transition text-xs"
-                    >
-                      <div className="truncate flex-1">
-                        <div className="font-bold text-white truncate">{p.name}</div>
-                        <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
-                          <span className="text-emerald-400 font-bold">{p.position}</span>
-                          <span>•</span>
-                          <span>{calculateAgeFromDOB(p.dateOfBirth, p.age, gameYear)} años</span>
-                        </div>
-                      </div>
-
-                      {/* Dropdown/Buttons to quickly place in a cell */}
-                      <div className="flex gap-1 shrink-0">
-                        {/* Auto-suggest button */}
-                        <button
-                          onClick={() => handleAssignToCell(p, 'recambio', autoCol)}
-                          className="px-1.5 py-1 bg-emerald-950/20 text-emerald-400 border border-emerald-900/40 hover:bg-emerald-900 hover:text-white rounded text-[9px] font-mono font-bold transition flex items-center gap-0.5"
-                          title={`Asignar automáticamente a Recambio / columna ${autoCol}`}
-                        >
-                          Alinear
-                        </button>
-                        
-                        {/* Manual placement click trigger */}
-                        <button
-                          onClick={() => {
-                            setSelectedPlayer(p);
-                          }}
-                          className="p-1 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded text-slate-400 hover:text-white transition"
-                          title="Ubicar de forma manual"
-                        >
-                          <Plus className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-        </div>
-
-      </div>
 
       {/* MODAL 1: ADD PLAYER TO SPECIFIC CELL [rowKey, colKey] */}
       {activeCell && (
