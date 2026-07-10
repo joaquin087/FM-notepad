@@ -565,11 +565,9 @@ export default function App() {
     .filter(p => p.squadStatus !== 'cedidos')
     .reduce((sum, p) => sum + parseWageNumeric(p.wage), 0);
 
-  // Compute total annual wage (weekly * 52.1429)
-  const totalAnnualWages = totalWeeklyWages * 52.1429;
-  const formattedAnnualWages = totalAnnualWages >= 1000000 
-    ? `€${(totalAnnualWages / 1000000).toFixed(2)}M p/a`
-    : `€${(totalAnnualWages / 1000).toFixed(0)}K p/a`;
+  // Compute total annual wage (weekly * 52)
+  const totalAnnualWages = totalWeeklyWages * 52;
+  const formattedAnnualWages = `€${Math.round(totalAnnualWages).toLocaleString()} p/a`;
 
   // Filter candidates for selected position
   const getCandidatesForSelectedPosition = () => {
