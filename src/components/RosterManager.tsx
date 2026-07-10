@@ -1860,8 +1860,8 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                   <option value="juvenil">🔵 Planificado Juvenil</option>
                   <option value="recambio">🔄 Planificado Recambio</option>
                   <option value="cedidos">✈️ Cedido (Préstamo)</option>
-                  <option value="aceder">📋 A ceder</option>
-                  <option value="venta">💰 Transferible (Venta)</option>
+                  <option value="aceder">📋 Cedibles</option>
+                  <option value="venta">💰 Transferibles</option>
                   <option value="desarrollo">🌱 Desarrollo</option>
                   <option value="descartes">❌ Descarte</option>
                   <option value="baja">📉 Baja del Club</option>
@@ -2239,8 +2239,8 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                               <option value="juvenil">🔵 Juvenil</option>
                               <option value="recambio">🔄 Recambio</option>
                               <option value="cedidos">✈️ Cedido</option>
-                              <option value="aceder">📋 A ceder</option>
-                              <option value="venta">💰 Venta</option>
+                              <option value="aceder">📋 Cedibles</option>
+                              <option value="venta">💰 Transferibles</option>
                               <option value="desarrollo">🌱 Desarrollo</option>
                               <option value="descartes">❌ Descarte</option>
                               <option value="baja">📉 Dar de Baja</option>

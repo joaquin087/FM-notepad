@@ -608,6 +608,9 @@ export default function App() {
     if (!selectedPosition) return [];
 
     return players.filter(p => {
+      // Ignorar jugadores cedidos o de baja
+      if (p.squadStatus === 'cedidos' || p.squadStatus === 'baja') return false;
+
       // Filter out players already assigned as other roles unless they are currently in the selected slots
       const isCurrentlyAssignedElsewhere = Object.entries(assignments).some(([posKey, rawSlot]) => {
         const slot = rawSlot as { titular: string | null; suplente: string | null; juvenil: string | null };
@@ -653,7 +656,7 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-white flex items-center gap-2">
-              Squad Architect <span className="text-slate-500 font-normal text-xs">v1.2</span>
+              FM Notepad <span className="text-slate-500 font-normal text-xs">v1.2</span>
             </h1>
             <p className="text-[10px] text-slate-500 font-mono tracking-wider uppercase">GESTIÓN DE PLANTILLAS Y ANÁLISIS DE PROFUNDIDAD</p>
           </div>
@@ -1164,7 +1167,7 @@ export default function App() {
               <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-1 shadow-md">
                 <span className="text-slate-500 uppercase text-[9px] font-bold block">Lista de Préstamos</span>
                 <span className="text-cyan-400 font-sans text-xl font-extrabold">{loanListCount}</span>
-                <span className="text-slate-500 text-[10px] block mt-1">Jugadores listados para ceder (Préstamos)</span>
+                <span className="text-slate-500 text-[10px] block mt-1">Jugadores listados como Cedibles (Préstamos)</span>
               </div>
               <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-1 shadow-md">
                 <span className="text-slate-500 uppercase text-[9px] font-bold block">Lista de Transferibles</span>
@@ -1293,7 +1296,7 @@ export default function App() {
       {/* Brand Footer */}
       <footer className="bg-slate-900 border-t border-slate-850 mt-12 py-6 text-xs text-slate-500 font-mono text-center">
         <div className="max-w-7xl mx-auto px-4 space-y-1.5">
-          <p>© 2026 Football Manager Squad Planner - Todos los derechos reservados.</p>
+          <p>© 2026 FM Notepad - Todos los derechos reservados.</p>
           <p className="text-[10px]">Diseñado para mánagers profesionales de simulación de fútbol. Datos almacenados de forma segura en tu navegador de manera persistente.</p>
         </div>
       </footer>
