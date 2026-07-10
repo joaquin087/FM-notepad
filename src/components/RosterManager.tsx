@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Player } from '../types';
 import { getFlagEmoji, isTurkishPlayer, formatRatingWithPercentage, getPlayerFlags, calculateAgeFromDOB, calculateContractYearsRemaining, calculateAgeFromDOBPrecise, calculateContractYearsRemainingPrecise } from '../utils/flags';
-import { Search, Filter, Plus, Trash2, Edit3, Check, X, Star, AlertCircle, RefreshCw, Trash } from 'lucide-react';
+import { Search, Filter, Plus, Trash2, Edit3, Check, X, Star, AlertCircle, RefreshCw, Trash, FileText, Calendar } from 'lucide-react';
 
 interface RosterManagerProps {
   players: Player[];
@@ -18,6 +18,20 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
   const [searchTerm, setSearchTerm] = useState('');
   const [positionFilter, setPositionFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [contractYearsFilter, setContractYearsFilter] = useState('ALL');
+
+  // Separate first and last name for manual add player
+  const [newFirstName, setNewFirstName] = useState('');
+  const [newLastName, setNewLastName] = useState('');
+
+  // Manual annual salary input
+  const [newAnnualWageInput, setNewAnnualWageInput] = useState('416000');
+
+  // Contract renewal states
+  const [renewingPlayer, setRenewingPlayer] = useState<Player | null>(null);
+  const [renewContractEnd, setRenewContractEnd] = useState('');
+  const [renewAnnualWage, setRenewAnnualWage] = useState('');
+
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [isAdding, setIsAdding] = useState(false);
 
@@ -45,6 +59,30 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
       numberPart *= 1000000;
     }
     return numberPart;
+  };
+
+  // Helper to parse entered annual wage to weekly wage
+  const parseAnnualWageInputToWeekly = (inputStr: string): number => {
+    if (!inputStr) return 0;
+    const clean = inputStr.replace(/\s/g, '').toLowerCase();
+    const parsedNum = clean.replace(/[^0-9.]/g, '');
+    let numberPart = parseFloat(parsedNum);
+    if (isNaN(numberPart)) return 0;
+    
+    if (clean.includes('k')) {
+      numberPart *= 1000;
+    } else if (clean.includes('m')) {
+      numberPart *= 1000000;
+    }
+    
+    return numberPart / 52;
+  };
+
+  // Helper to format weekly wage string
+  const formatWeeklyWage = (weekly: number): string => {
+    if (weekly >= 1000000) return `€${(weekly / 1000000).toFixed(1)}M/sem`;
+    if (weekly >= 1000) return `€${(weekly / 1000).toFixed(0)}K/sem`;
+    return `€${Math.round(weekly).toLocaleString()}/sem`;
   };
 
   // Helper to parse market value to numeric
@@ -180,7 +218,56 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                             
     const matchesStatus = statusFilter === 'ALL' || player.squadStatus === statusFilter;
 
-    return matchesSearch && matchesPosition && matchesStatus;
+    // Helper to calculate years remaining on a contract relative to precise game date
+    const getContractYearsValue = (contractEnd: string | undefined): number => {
+      if (!contractEnd || contractEnd === 'N/A' || contractEnd === 'N/D') return -1;
+      
+      const parseDate = (dStr: string): Date | null => {
+        const clean = dStr.trim();
+        const parts = clean.split(/[\.\-\/]+/);
+        if (parts.length === 3) {
+          let d = parseInt(parts[0]);
+          let m = parseInt(parts[1]) - 1; // 0-indexed
+          let y = parseInt(parts[2]);
+          if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
+          if (y < 100) y += 2000;
+          return new Date(y, m, d);
+        } else if (/^\d{4}$/.test(clean)) {
+          return new Date(parseInt(clean), 5, 30);
+        }
+        return null;
+      };
+
+      const dateCurrent = parseDate(gameDate);
+      const dateEnd = parseDate(contractEnd);
+
+      if (dateCurrent && dateEnd) {
+        const diffTime = dateEnd.getTime() - dateCurrent.getTime();
+        const diffDays = diffTime / (1000 * 60 * 60 * 24);
+        if (diffDays <= 0) return 0;
+        return diffDays / 365.25;
+      }
+      
+      return -1;
+    };
+
+    let matchesContractYears = true;
+    if (contractYearsFilter !== 'ALL') {
+      const yearsVal = getContractYearsValue(player.contractEnd);
+      if (yearsVal < 0) {
+        matchesContractYears = false;
+      } else {
+        const floorYears = Math.floor(yearsVal);
+        const filterValNum = parseInt(contractYearsFilter);
+        if (filterValNum === 5) {
+          matchesContractYears = yearsVal >= 5;
+        } else {
+          matchesContractYears = floorYears === filterValNum;
+        }
+      }
+    }
+
+    return matchesSearch && matchesPosition && matchesStatus && matchesContractYears;
   });
 
   // Calculate sortedPlayers
@@ -286,17 +373,62 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
     }
   };
 
+  const handleRenewClick = (player: Player) => {
+    setRenewingPlayer(player);
+    setRenewContractEnd(player.contractEnd && player.contractEnd !== 'N/A' && player.contractEnd !== 'N/D' ? player.contractEnd : '30/6/2030');
+    
+    // Get numeric weekly wage and calculate annual
+    const weekly = parseWageToNumeric(player.wage);
+    const annual = Math.round(weekly * 52);
+    setRenewAnnualWage(String(annual));
+    setFormError('');
+  };
+
+  const handleSaveRenewal = () => {
+    if (renewingPlayer) {
+      if (!renewContractEnd.trim()) {
+        setFormError("La fecha de fin de contrato es requerida.");
+        return;
+      }
+      
+      const weekly = parseAnnualWageInputToWeekly(renewAnnualWage);
+      const formattedWage = formatWeeklyWage(weekly);
+      
+      const updatedPlayer: Player = {
+        ...renewingPlayer,
+        contractEnd: renewContractEnd.trim(),
+        wage: formattedWage
+      };
+      
+      onUpdatePlayer(updatedPlayer);
+      setRenewingPlayer(null);
+      setFormError('');
+    }
+  };
+
   const handleCreatePlayer = () => {
-    if (!newPlayer.name.trim()) {
-      setFormError("El nombre del jugador es requerido.");
+    const trimmedFirst = newFirstName.trim();
+    const trimmedLast = newLastName.trim();
+    if (!trimmedFirst && !trimmedLast) {
+      setFormError("El nombre y/o apellido del jugador es requerido.");
       return;
     }
+    
+    // Format name as "Apellido, Nombre"
+    const fullName = trimmedLast && trimmedFirst 
+      ? `${trimmedLast}, ${trimmedFirst}` 
+      : (trimmedLast || trimmedFirst);
+
     const generatedId = customId.trim() || String(Date.now());
     const parsedCa = parseAbilityInput(newCaInput);
     const parsedPa = parseAbilityInput(newPaInput);
 
+    const weeklyWageNum = parseAnnualWageInputToWeekly(newAnnualWageInput);
+    const formattedWageStr = formatWeeklyWage(weeklyWageNum);
+
     onAddPlayer({
       ...newPlayer,
+      name: fullName,
       id: generatedId,
       currentAbility: parsedCa.stars,
       potentialAbility: parsedPa.stars,
@@ -304,11 +436,17 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
       bestPotRating: parsedPa.rawRating,
       contractEnd: contractEndInput.trim() || 'N/A',
       dateOfBirth: dateOfBirthInput.trim() || 'N/A',
-      club: clubInput.trim() || 'N/A'
+      club: clubInput.trim() || 'N/A',
+      wage: formattedWageStr
     });
+    
     setIsAdding(false);
     setFormError('');
-    // Reset form
+    
+    // Reset form states
+    setNewFirstName('');
+    setNewLastName('');
+    setNewAnnualWageInput('416000');
     setNewPlayer({
       name: '',
       age: 18,
@@ -511,7 +649,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-500" />
@@ -554,6 +692,24 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
               ))}
           </select>
         </div>
+
+        {/* Years of contract filter */}
+        <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg px-2">
+          <span className="text-[10px] uppercase font-bold text-slate-500 font-sans whitespace-nowrap">Años Contrato:</span>
+          <select
+            value={contractYearsFilter}
+            onChange={(e) => setContractYearsFilter(e.target.value)}
+            className="w-full bg-transparent border-0 text-xs py-1.5 text-slate-200 focus:outline-none focus:ring-0 cursor-pointer font-sans"
+          >
+            <option value="ALL" className="bg-slate-900">Todos</option>
+            <option value="0" className="bg-slate-900">0 años</option>
+            <option value="1" className="bg-slate-900">1 año</option>
+            <option value="2" className="bg-slate-900">2 años</option>
+            <option value="3" className="bg-slate-900">3 años</option>
+            <option value="4" className="bg-slate-900">4 años</option>
+            <option value="5" className="bg-slate-900 font-sans">5 años o más</option>
+          </select>
+        </div>
       </div>
 
       {/* Adding form */}
@@ -562,25 +718,35 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
           <h3 className="text-xs font-bold text-emerald-400 font-sans uppercase tracking-wider border-b border-slate-800 pb-1">
             🆕 Registrar Nuevo Jugador en el Plantel
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-xs">
             <div>
               <label className="text-[10px] text-slate-400">ID Único (FMRD)</label>
               <input
                 type="text"
-                placeholder="Opcional (se auto-genera)"
+                placeholder="Opcional"
                 value={customId}
                 onChange={(e) => setCustomId(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 font-mono"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-slate-400">Primer Nombre</label>
+              <input
+                type="text"
+                placeholder="Ej. Lionel"
+                value={newFirstName}
+                onChange={(e) => setNewFirstName(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100"
               />
             </div>
             <div>
-              <label className="text-[10px] text-slate-400">Nombre Completo</label>
+              <label className="text-[10px] text-slate-400">Apellido</label>
               <input
                 type="text"
-                placeholder="Ej. Lionel Messi"
-                value={newPlayer.name}
-                onChange={(e) => setNewPlayer({ ...newPlayer, name: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100"
+                placeholder="Ej. Messi"
+                value={newLastName}
+                onChange={(e) => setNewLastName(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 font-semibold"
               />
             </div>
             <div>
@@ -588,7 +754,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
               <select
                 value={newPlayer.position}
                 onChange={(e) => setNewPlayer({ ...newPlayer, position: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 cursor-pointer"
+                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 cursor-pointer font-bold text-emerald-400"
               >
                 {positionsList.filter(p => p !== 'ALL').map(p => (
                   <option key={p} value={p}>{p}</option>
@@ -633,18 +799,23 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
               <label className="text-[10px] text-slate-400">Valor de Mercado</label>
               <input
                 type="text"
+                placeholder="Ej. €1.5M"
                 value={newPlayer.marketValue}
                 onChange={(e) => setNewPlayer({ ...newPlayer, marketValue: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100"
+                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 font-mono"
               />
             </div>
             <div>
-              <label className="text-[10px] text-slate-400">Sueldo Estimado</label>
+              <label className="text-[10px] text-slate-400 flex justify-between">
+                <span>Sueldo Anual (€)</span>
+                <span className="text-emerald-500 font-mono">Convertirá a sem.</span>
+              </label>
               <input
                 type="text"
-                value={newPlayer.wage}
-                onChange={(e) => setNewPlayer({ ...newPlayer, wage: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100"
+                placeholder="Ej. 416000 o 416K"
+                value={newAnnualWageInput}
+                onChange={(e) => setNewAnnualWageInput(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-slate-100 font-bold"
               />
             </div>
           </div>
@@ -1001,6 +1172,77 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
         </div>
       )}
 
+      {/* Contract Renewal Modal Overlay */}
+      {renewingPlayer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  🤝 Renovar Contrato de Jugador
+                </h3>
+                <span className="text-[11px] font-sans text-emerald-400 font-bold">{renewingPlayer.name} ({renewingPlayer.position})</span>
+              </div>
+              <button onClick={() => setRenewingPlayer(null)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {formError && (
+              <div className="bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs px-3 py-2 rounded-lg flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{formError}</span>
+              </div>
+            )}
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Nueva Fecha Fin de Contrato</label>
+                <input
+                  type="text"
+                  placeholder="Ej. 30/6/2031"
+                  value={renewContractEnd}
+                  onChange={(e) => setRenewContractEnd(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1 focus:border-emerald-600 focus:outline-none"
+                />
+                <p className="text-[10px] text-slate-500 mt-0.5 font-sans">Formato sugerido: DD/M/AAAA (ej. 30/6/2031)</p>
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Nuevo Sueldo Anual (€)</label>
+                <input
+                  type="text"
+                  placeholder="Ej. 500K o 500000"
+                  value={renewAnnualWage}
+                  onChange={(e) => setRenewAnnualWage(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1 focus:border-emerald-600 focus:outline-none font-bold"
+                />
+                <p className="text-[10px] text-slate-500 mt-0.5 font-sans">Monto anual. El sistema lo convertirá a sueldo semanal.</p>
+              </div>
+
+              <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-[11px] text-slate-400 leading-relaxed font-sans">
+                💡 <span className="font-semibold text-slate-200">Resumen de Conversión:</span> Al ingresar <span className="font-bold text-emerald-400">€{(parseFloat(renewAnnualWage.replace(/[^0-9.]/g, '')) || 0).toLocaleString()}</span> anuales, el jugador recibirá aproximadamente <span className="font-bold text-emerald-400">{formatWeeklyWage(parseAnnualWageInputToWeekly(renewAnnualWage))}</span> de sueldo semanal.
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 text-xs pt-2 border-t border-slate-800/60">
+              <button
+                onClick={() => setRenewingPlayer(null)}
+                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveRenewal}
+                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition"
+              >
+                Confirmar Renovación
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Roster Table */}
       <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
         <table className="min-w-full divide-y divide-slate-800 text-left text-xs font-sans">
@@ -1160,6 +1402,17 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                               title="Editar ficha"
                             >
                               <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                handleRenewClick(player);
+                                setConfirmBajaId(null);
+                              }}
+                              className="p-1 rounded bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-900/30 transition"
+                              title="Renovar Contrato"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
                             </button>
 
                             <button
