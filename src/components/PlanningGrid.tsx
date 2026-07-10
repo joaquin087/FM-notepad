@@ -48,8 +48,8 @@ export const SQUAD_CATEGORIES = [
   { key: 'juvenil', label: 'Juvenil', textColor: 'text-cyan-400', bgColor: 'bg-cyan-950/20', borderColor: 'border-cyan-500/30', headerColor: 'border-l-4 border-l-cyan-500' },
   { key: 'recambio', label: 'Recambio', textColor: 'text-slate-200', bgColor: 'bg-slate-900/50', borderColor: 'border-slate-800', headerColor: 'border-l-4 border-l-slate-400' },
   { key: 'cedidos', label: 'Cedidos', textColor: 'text-violet-400', bgColor: 'bg-violet-950/20', borderColor: 'border-violet-500/30', headerColor: 'border-l-4 border-l-violet-500' },
-  { key: 'aceder', label: 'A ceder', textColor: 'text-purple-400', bgColor: 'bg-purple-950/20', borderColor: 'border-purple-500/30', headerColor: 'border-l-4 border-l-purple-500' },
-  { key: 'venta', label: 'Venta', textColor: 'text-rose-400', bgColor: 'bg-rose-950/20', borderColor: 'border-rose-500/30', headerColor: 'border-l-4 border-l-rose-500' },
+  { key: 'aceder', label: 'Cedibles', textColor: 'text-purple-400', bgColor: 'bg-purple-950/20', borderColor: 'border-purple-500/30', headerColor: 'border-l-4 border-l-purple-500' },
+  { key: 'venta', label: 'Transferibles', textColor: 'text-rose-400', bgColor: 'bg-rose-950/20', borderColor: 'border-rose-500/30', headerColor: 'border-l-4 border-l-rose-500' },
   { key: 'desarrollo', label: 'Desarrollo', textColor: 'text-blue-400', bgColor: 'bg-blue-950/20', borderColor: 'border-blue-500/30', headerColor: 'border-l-4 border-l-blue-500' },
   { key: 'descartes', label: 'Descartes', textColor: 'text-slate-500', bgColor: 'bg-slate-950/40', borderColor: 'border-slate-900', headerColor: 'border-l-4 border-l-slate-700' },
 ] as const;
@@ -111,6 +111,10 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, ga
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [filterUnassignedOnly, setFilterUnassignedOnly] = useState(true);
+  
+  // Drag and Drop States
+  const [draggedOverCell, setDraggedOverCell] = useState<{ rowKey: string; colKey: string } | null>(null);
+  const [draggedOverUnassigned, setDraggedOverUnassigned] = useState(false);
 
   // High-fidelity half-star renderer
   const renderVisualStars = (starsCount: number, colorClass: string = 'text-amber-400', fillClass: string = 'fill-amber-400') => {
@@ -144,9 +148,9 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, ga
     );
   };
 
-  // Active players (excluding those who are Bajas or Cedidos)
+  // Active players (excluding those who are Bajas)
   const activePlayers = useMemo(() => {
-    return players.filter(p => p.squadStatus !== 'baja' && p.squadStatus !== 'cedidos');
+    return players.filter(p => p.squadStatus !== 'baja');
   }, [players]);
 
   // Group players by assigned position and status for instant O(1) grid queries
@@ -291,13 +295,40 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, ga
       </div>
 
       {/* SECTION: JUGADORES SIN CLASIFICAR */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+      <div 
+        onDragOver={(e) => {
+          e.preventDefault();
+        }}
+        onDragEnter={(e) => {
+          e.preventDefault();
+          setDraggedOverUnassigned(true);
+        }}
+        onDragLeave={() => {
+          setDraggedOverUnassigned(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDraggedOverUnassigned(false);
+          const playerId = e.dataTransfer.getData('text/plain');
+          if (playerId) {
+            const player = players.find(p => p.id === playerId);
+            if (player) {
+              handleUnassignPlayer(player);
+            }
+          }
+        }}
+        className={`bg-slate-900 border rounded-2xl overflow-hidden shadow-xl transition-all duration-200 ${
+          draggedOverUnassigned 
+            ? 'border-dashed border-emerald-500 ring-2 ring-emerald-500/10 bg-slate-850' 
+            : 'border-slate-800'
+        }`}
+      >
         <div className="p-4 bg-slate-850 border-b border-slate-800 flex justify-between items-center">
           <div>
             <h3 className="text-xs font-bold text-white flex items-center gap-1.5 uppercase font-mono">
               <UserMinus className="w-3.5 h-3.5 text-slate-400" /> Jugadores Sin Clasificar ({unassignedPlayers.length})
             </h3>
-            <p className="text-[10px] text-slate-500 mt-0.5">Jugadores cargados en el plantel que aún no han sido asignados a ninguna posición en la matriz táctica.</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">Jugadores cargados en el plantel que aún no han sido asignados a ninguna posición en la matriz táctica. Puedes arrastrar jugadores aquí para desasignarlos.</p>
           </div>
         </div>
 
@@ -313,7 +344,12 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, ga
                 return (
                   <div
                     key={p.id}
-                    className="p-3 bg-slate-950 hover:bg-slate-850/50 rounded-xl border border-slate-850 hover:border-slate-800 transition flex flex-col justify-between gap-2.5 text-xs relative group"
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('text/plain', p.id);
+                      e.dataTransfer.effectAllowed = 'move';
+                    }}
+                    className="p-3 bg-slate-950 hover:bg-slate-850/50 rounded-xl border border-slate-850 hover:border-slate-800 cursor-grab active:cursor-grabbing transition flex flex-col justify-between gap-2.5 text-xs relative group"
                   >
                     <div className="truncate">
                       <div className="font-bold text-white truncate text-xs" title={p.name}>{p.name}</div>
@@ -392,11 +428,37 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, ga
                       {POSITION_COLUMNS.map(col => {
                         const cellKey = `${row.key}_${col.key}`;
                         const cellPlayers = gridData[cellKey] || [];
+                        const isDraggedOver = draggedOverCell?.rowKey === row.key && draggedOverCell?.colKey === col.key;
 
                         return (
                           <td 
                             key={col.key} 
-                            className="p-1.5 border-r border-slate-850/40 relative min-w-[115px] h-auto hover:bg-slate-900/40 transition group align-top"
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                            }}
+                            onDragEnter={(e) => {
+                              e.preventDefault();
+                              setDraggedOverCell({ rowKey: row.key, colKey: col.key });
+                            }}
+                            onDragLeave={() => {
+                              setDraggedOverCell(prev => (prev?.rowKey === row.key && prev?.colKey === col.key) ? null : prev);
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              setDraggedOverCell(null);
+                              const playerId = e.dataTransfer.getData('text/plain');
+                              if (playerId) {
+                                const player = players.find(p => p.id === playerId);
+                                if (player) {
+                                  handleMovePlayer(player, row.key, col.key);
+                                }
+                              }
+                            }}
+                            className={`p-1.5 border-r border-slate-850/40 relative min-w-[115px] h-auto transition group align-top ${
+                              isDraggedOver 
+                                ? 'bg-emerald-950/40 ring-2 ring-emerald-500/50 z-20' 
+                                : 'hover:bg-slate-900/40'
+                            }`}
                           >
                             <div className="min-h-[75px] w-full flex flex-col justify-between gap-2">
                               
@@ -411,11 +473,16 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, ga
                                   return (
                                     <div 
                                       key={p.id}
+                                      draggable
+                                      onDragStart={(e) => {
+                                        e.dataTransfer.setData('text/plain', p.id);
+                                        e.dataTransfer.effectAllowed = 'move';
+                                      }}
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setSelectedPlayer(p);
                                       }}
-                                      className={`p-1 rounded-lg border cursor-pointer transition flex flex-col justify-between shadow-sm relative group/item ${
+                                      className={`p-1 rounded-lg border cursor-grab active:cursor-grabbing transition flex flex-col justify-between shadow-sm relative group/item ${
                                         isTurkish
                                           ? 'bg-red-950/20 border-red-500/40 shadow-[0_0_6px_rgba(239,68,68,0.2)] hover:border-red-500 hover:bg-red-950/30'
                                           : 'bg-slate-900 border-slate-800 hover:border-emerald-500/50 hover:bg-slate-850'

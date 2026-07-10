@@ -238,8 +238,8 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
     'juvenil': '🔵 Juvenil',
     'recambio': '🔄 Recambio',
     'cedidos': '✈️ Cedido',
-    'aceder': '📋 A ceder',
-    'venta': '💰 Venta',
+    'aceder': '📋 Cedibles',
+    'venta': '💰 Transferibles',
     'desarrollo': '🌱 Desarrollo',
     'descartes': '❌ Descarte',
     'no_asignado': '⚪ Sin Asignar',
@@ -519,11 +519,11 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
       // Name split validation
       const trimmedFirst = editFirstName.trim();
       const trimmedLast = editLastName.trim();
-      if (!trimmedLast) {
-        setFormError("El apellido del jugador es obligatorio.");
+      if (!trimmedFirst) {
+        setFormError("El primer nombre del jugador es obligatorio.");
         return;
       }
-      const finalName = trimmedFirst ? `${trimmedLast}, ${trimmedFirst}` : trimmedLast;
+      const finalName = trimmedFirst && trimmedLast ? `${trimmedLast}, ${trimmedFirst}` : trimmedFirst;
 
       // Nationality validation
       const mainNac = editNacionalidad1.trim();
@@ -726,9 +726,6 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
     // Nombre & Apellido validation
     if (!newFirstName.trim()) {
       errors.newFirstName = "El primer nombre es obligatorio.";
-    }
-    if (!newLastName.trim()) {
-      errors.newLastName = "El apellido es obligatorio.";
     }
 
     // Nacionalidad validation
@@ -1225,19 +1222,14 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                   </div>
 
                   <div>
-                    <label className="text-[10px] text-slate-400 block mb-1">Apellido *</label>
+                    <label className="text-[10px] text-slate-400 block mb-1">Apellido (Opcional)</label>
                     <input
                       type="text"
                       placeholder="Ej. Messi"
                       value={newLastName}
                       onChange={(e) => setNewLastName(e.target.value)}
-                      className={`w-full bg-slate-950 border rounded p-1.5 text-slate-100 font-semibold focus:outline-none transition ${
-                        errors.newLastName ? 'border-rose-500 ring-1 ring-rose-500/20' : 'border-slate-800 focus:border-emerald-600'
-                      }`}
+                      className="w-full bg-slate-950 border rounded p-1.5 text-slate-100 font-semibold focus:outline-none transition border-slate-800 focus:border-emerald-600"
                     />
-                    {errors.newLastName && (
-                      <span className="text-[9px] text-rose-400 mt-0.5 block">{errors.newLastName}</span>
-                    )}
                   </div>
 
                   <div>
@@ -1599,7 +1591,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
               </div>
 
               <div>
-                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Apellido *</label>
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Apellido (Opcional)</label>
                 <input
                   type="text"
                   placeholder="Ej. Messi"

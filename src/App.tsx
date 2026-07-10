@@ -1167,7 +1167,7 @@ export default function App() {
                 <span className="text-slate-500 text-[10px] block mt-1">Jugadores listados para ceder (Préstamos)</span>
               </div>
               <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-1 shadow-md">
-                <span className="text-slate-500 uppercase text-[9px] font-bold block">Lista de Ventas</span>
+                <span className="text-slate-500 uppercase text-[9px] font-bold block">Lista de Transferibles</span>
                 <span className="text-rose-400 font-sans text-xl font-extrabold">{sellListCount}</span>
                 <span className="text-slate-500 text-[10px] block mt-1">Jugadores listados como transferibles</span>
               </div>
