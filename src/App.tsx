@@ -3,6 +3,7 @@ import { Player, PitchPosition, Formation, SquadPlan, Snapshot } from './types';
 import { defaultPlayers, defaultFormations } from './defaultPlayers';
 import { PitchView } from './components/PitchView';
 import { RosterManager } from './components/RosterManager';
+import { TransferHistory } from './components/TransferHistory';
 import { ClipboardImporter } from './components/ClipboardImporter';
 import { ProgressionTracker } from './components/ProgressionTracker';
 import { PlanningGrid, getAutoColumn } from './components/PlanningGrid';
@@ -139,7 +140,7 @@ export default function App() {
     setGameDate(`${day}/${formattedMonth}/${year}`);
   };
 
-  const [activeTab, setActiveTab] = useState<'squad_pitch' | 'players_list' | 'clipboard_import' | 'stats' | 'progression_tracker' | 'planning_grid'>('planning_grid');
+  const [activeTab, setActiveTab] = useState<'squad_pitch' | 'players_list' | 'clipboard_import' | 'stats' | 'progression_tracker' | 'planning_grid' | 'transfer_history'>('planning_grid');
   const [selectedPosition, setSelectedPosition] = useState<PitchPosition | null>(null);
   const [candidateSearch, setCandidateSearch] = useState('');
   const [showAllCandidates, setShowAllCandidates] = useState(false);
@@ -564,8 +565,9 @@ export default function App() {
   };
 
   // Calculate high level stats for display
-  const totalPlayers = players.length;
-  const planGksCount = players.filter(p => p.squadStatus && p.squadStatus !== 'no_asignado').length;
+  const activePlayersList = players.filter(p => p.squadStatus !== 'baja');
+  const totalPlayers = activePlayersList.length;
+  const planGksCount = players.filter(p => p.squadStatus && p.squadStatus !== 'no_asignado' && p.squadStatus !== 'baja').length;
   const loanListCount = players.filter(p => p.squadStatus === 'cedidos').length;
   const sellListCount = players.filter(p => p.squadStatus === 'venta').length;
   const unassignedCount = players.filter(p => p.squadStatus === 'no_asignado').length;
@@ -580,7 +582,7 @@ export default function App() {
   const nonTurkishCount = nonTurkishCorePlayers.length;
 
   const averageAge = totalPlayers > 0 
-    ? (players.reduce((sum, p) => sum + p.age, 0) / totalPlayers).toFixed(1) 
+    ? (activePlayersList.reduce((sum, p) => sum + p.age, 0) / totalPlayers).toFixed(1) 
     : "0";
 
   // Compute total wage (parse e.g. "€10K/sem" or "€150K/sem" into numeric euro values)
@@ -805,6 +807,17 @@ export default function App() {
               `}
             >
               📸 Historial y Progreso
+            </button>
+            <button
+              onClick={() => setActiveTab('transfer_history')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-sans transition flex items-center gap-1.5 whitespace-nowrap
+                ${activeTab === 'transfer_history' 
+                  ? 'bg-slate-800 text-emerald-400 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }
+              `}
+            >
+              🔄 Mercado de Pases
             </button>
           </div>
 
@@ -1116,7 +1129,7 @@ export default function App() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span>Total en plantilla:</span>
-                      <span className="text-slate-200 font-bold font-sans">{players.length} jugadores</span>
+                      <span className="text-slate-200 font-bold font-sans">{totalPlayers} jugadores</span>
                     </div>
                   </div>
                 </div>
@@ -1143,7 +1156,7 @@ export default function App() {
         {activeTab === 'clipboard_import' && (
           <ClipboardImporter
             onImportPlayers={handleImportPlayers}
-            currentPlayersCount={players.length}
+            currentPlayersCount={totalPlayers}
             gameDate={gameDate}
             onChangeGameDate={setGameDate}
           />
@@ -1288,6 +1301,15 @@ export default function App() {
             onDeleteSnapshot={handleDeleteSnapshot}
             currentPlayers={players}
             onLoadSnapshotRoster={handleLoadSnapshotRoster}
+          />
+        )}
+
+        {/* TAB 7: TRANSFER HISTORY */}
+        {activeTab === 'transfer_history' && (
+          <TransferHistory
+            players={players}
+            gameDate={gameDate}
+            gameYear={gameYear}
           />
         )}
 

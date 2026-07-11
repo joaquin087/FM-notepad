@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Player } from '../types';
 import { getFlagEmoji, isTurkishPlayer, formatRatingWithPercentage, getPlayerFlags, calculateAgeFromDOB, calculateContractYearsRemaining, calculateAgeFromDOBPrecise, calculateContractYearsRemainingPrecise } from '../utils/flags';
-import { Search, Filter, Plus, Trash2, Edit3, Check, X, Star, AlertCircle, RefreshCw, Trash, FileText, Calendar } from 'lucide-react';
+import { Search, Filter, Plus, Trash2, Edit3, Check, X, Star, AlertCircle, RefreshCw, Trash, FileText, Calendar, UserMinus } from 'lucide-react';
 import { fifaNations } from '../utils/fifaNations';
 
 interface RosterManagerProps {
@@ -67,6 +67,34 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
   const [editPrestamoDay, setEditPrestamoDay] = useState('');
   const [editPrestamoMonth, setEditPrestamoMonth] = useState('');
   const [editPrestamoYear, setEditPrestamoYear] = useState('');
+  
+  // New player arrival states
+  const [llegadaDay, setLlegadaDay] = useState(() => gameDate.split('/')[0] || '01');
+  const [llegadaMonth, setLlegadaMonth] = useState(() => gameDate.split('/')[1] || '07');
+  const [llegadaYear, setLlegadaYear] = useState(() => gameDate.split('/')[2] || '2026');
+  const [newOrigen, setNewOrigen] = useState('');
+  const [newMontoCompra, setNewMontoCompra] = useState('0');
+  const [newCanterano, setNewCanterano] = useState(false);
+
+  // Edit player arrival states
+  const [editLlegadaDay, setEditLlegadaDay] = useState('');
+  const [editLlegadaMonth, setEditLlegadaMonth] = useState('');
+  const [editLlegadaYear, setEditLlegadaYear] = useState('');
+  const [editOrigen, setEditOrigen] = useState('');
+  const [editMontoCompra, setEditMontoCompra] = useState('0');
+  const [editCanterano, setEditCanterano] = useState(false);
+
+  // Dedicated Baja modal states
+  const [bajaPlayer, setBajaPlayer] = useState<Player | null>(null);
+  const [bajaDay, setBajaDay] = useState('');
+  const [bajaMonth, setBajaMonth] = useState('');
+  const [bajaYear, setBajaYear] = useState('');
+  const [bajaMonto, setBajaMonto] = useState('0');
+  const [bajaDestino, setBajaDestino] = useState('');
+  const [bajaIsLibre, setBajaIsLibre] = useState(false);
+  const [bajaIsRetirado, setBajaIsRetirado] = useState(false);
+  const [bajaComentario, setBajaComentario] = useState('');
+
   const [isAdding, setIsAdding] = useState(false);
 
   // Sorting state
@@ -252,76 +280,79 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
   const cedidosPlayers = players.filter(p => p.squadStatus === 'cedidos');
   const desarrolloPlayers = players.filter(p => p.squadStatus === 'desarrollo');
 
-  const filteredPlayers = activeRosterPlayers.filter(player => {
-    const matchesSearch = player.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          player.id.includes(searchTerm) ||
-                          player.nationality.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // Position filters. Support simple inclusion check
-    const matchesPosition = positionFilter === 'ALL' || 
-                            player.position.toLowerCase() === positionFilter.toLowerCase() ||
-                            player.position.toLowerCase().includes(positionFilter.toLowerCase());
-                            
-    const matchesStatus = statusFilter === 'ALL' || player.squadStatus === statusFilter;
-
-    // Helper to calculate years remaining on a contract relative to precise game date
-    const getContractYearsValue = (contractEnd: string | undefined): number => {
-      if (!contractEnd || contractEnd === 'N/A' || contractEnd === 'N/D') return -1;
-      
-      const parseDate = (dStr: string): Date | null => {
-        const clean = dStr.trim();
-        const parts = clean.split(/[\.\-\/]+/);
-        if (parts.length === 3) {
-          let d = parseInt(parts[0]);
-          let m = parseInt(parts[1]) - 1; // 0-indexed
-          let y = parseInt(parts[2]);
-          if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
-          if (y < 100) y += 2000;
-          return new Date(y, m, d);
-        } else if (/^\d{4}$/.test(clean)) {
-          return new Date(parseInt(clean), 5, 30);
-        }
-        return null;
-      };
-
-      const dateCurrent = parseDate(gameDate);
-      const dateEnd = parseDate(contractEnd);
-
-      if (dateCurrent && dateEnd) {
-        const diffTime = dateEnd.getTime() - dateCurrent.getTime();
-        const diffDays = diffTime / (1000 * 60 * 60 * 24);
-        if (diffDays <= 0) return 0;
-        return diffDays / 365.25;
-      }
-      
-      return -1;
-    };
-
-    let matchesContractYears = true;
-    if (contractYearsFilter !== 'ALL') {
-      const yearsVal = getContractYearsValue(player.contractEnd);
-      if (yearsVal < 0) {
-        matchesContractYears = false;
-      } else {
-        const displayYears = Math.round(yearsVal * 10) / 10;
-        if (contractYearsFilter === '1_or_less') {
-          matchesContractYears = displayYears <= 1.0;
-        } else if (contractYearsFilter === '2') {
-          matchesContractYears = displayYears > 1.0 && displayYears <= 2.0;
-        } else if (contractYearsFilter === '3') {
-          matchesContractYears = displayYears > 2.0 && displayYears <= 3.0;
-        } else if (contractYearsFilter === '4_or_more') {
-          matchesContractYears = displayYears > 3.0;
-        }
-      }
+  // Helper to parse dates inside applyFilters
+  const parseDateStr = (dStr: string): Date | null => {
+    const clean = dStr.trim();
+    const parts = clean.split(/[\.\-\/]+/);
+    if (parts.length === 3) {
+      let d = parseInt(parts[0]);
+      let m = parseInt(parts[1]) - 1; // 0-indexed
+      let y = parseInt(parts[2]);
+      if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
+      if (y < 100) y += 2000;
+      return new Date(y, m, d);
+    } else if (/^\d{4}$/.test(clean)) {
+      return new Date(parseInt(clean), 5, 30);
     }
+    return null;
+  };
 
-    const calculatedAge = calculateAgeFromDOBPrecise(player.dateOfBirth, player.age, gameDate);
-    const matchesMinAge = minAgeFilter === '' || calculatedAge >= parseInt(minAgeFilter);
-    const matchesMaxAge = maxAgeFilter === '' || calculatedAge <= parseInt(maxAgeFilter);
+  const getContractYearsValue = (contractEnd: string | undefined): number => {
+    if (!contractEnd || contractEnd === 'N/A' || contractEnd === 'N/D') return -1;
+    const dateCurrent = parseDateStr(gameDate);
+    const dateEnd = parseDateStr(contractEnd);
+    if (dateCurrent && dateEnd) {
+      const diffTime = dateEnd.getTime() - dateCurrent.getTime();
+      const diffDays = diffTime / (1000 * 60 * 60 * 24);
+      if (diffDays <= 0) return 0;
+      return diffDays / 365.25;
+    }
+    return -1;
+  };
 
-    return matchesSearch && matchesPosition && matchesStatus && matchesContractYears && matchesMinAge && matchesMaxAge;
-  });
+  const applyFilters = (playerList: Player[], ignoreStatusFilter = false) => {
+    return playerList.filter(player => {
+      const matchesSearch = player.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                            player.id.includes(searchTerm) ||
+                            player.nationality.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesPosition = positionFilter === 'ALL' || 
+                              player.position.toLowerCase() === positionFilter.toLowerCase() ||
+                              player.position.toLowerCase().includes(positionFilter.toLowerCase());
+                              
+      const matchesStatus = ignoreStatusFilter || statusFilter === 'ALL' || player.squadStatus === statusFilter;
+
+      let matchesContractYears = true;
+      if (contractYearsFilter !== 'ALL') {
+        const yearsVal = getContractYearsValue(player.contractEnd);
+        if (yearsVal < 0) {
+          matchesContractYears = false;
+        } else {
+          const displayYears = Math.round(yearsVal * 10) / 10;
+          if (contractYearsFilter === '1_or_less') {
+            matchesContractYears = displayYears <= 1.0;
+          } else if (contractYearsFilter === '2') {
+            matchesContractYears = displayYears > 1.0 && displayYears <= 2.0;
+          } else if (contractYearsFilter === '3') {
+            matchesContractYears = displayYears > 2.0 && displayYears <= 3.0;
+          } else if (contractYearsFilter === '4_or_more') {
+            matchesContractYears = displayYears > 3.0;
+          }
+        }
+      }
+
+      const calculatedAge = calculateAgeFromDOBPrecise(player.dateOfBirth, player.age, gameDate);
+      const matchesMinAge = minAgeFilter === '' || calculatedAge >= parseInt(minAgeFilter);
+      const matchesMaxAge = maxAgeFilter === '' || calculatedAge <= parseInt(maxAgeFilter);
+
+      return matchesSearch && matchesPosition && matchesStatus && matchesContractYears && matchesMinAge && matchesMaxAge;
+    });
+  };
+
+  const filteredPlayers = applyFilters(activeRosterPlayers, false);
+  const filteredDesarrollo = applyFilters(desarrolloPlayers, true);
+  const filteredCedidos = applyFilters(cedidosPlayers, true);
+  const filteredBajas = applyFilters(bajasPlayers, true);
 
   // Calculate sortedPlayers
   const sortedPlayers = [...filteredPlayers].sort((a, b) => {
@@ -692,6 +723,54 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
       
       onUpdatePlayer(updatedPlayer);
       setRenewingPlayer(null);
+      setFormError('');
+    }
+  };
+
+  const handleBajaClick = (player: Player) => {
+    setBajaPlayer(player);
+    const dateParts = gameDate.split('/');
+    setBajaDay(dateParts[0] || '01');
+    setBajaMonth(dateParts[1] || '07');
+    setBajaYear(dateParts[2] || '2026');
+    setBajaMonto('0');
+    setBajaDestino('');
+    setBajaIsLibre(false);
+    setBajaIsRetirado(false);
+    setBajaComentario('');
+    setFormError('');
+  };
+
+  const handleConfirmBaja = () => {
+    if (bajaPlayer) {
+      if (!bajaDay.trim() || !bajaMonth.trim() || !bajaYear.trim()) {
+        setFormError("La fecha de baja es obligatoria (Día, Mes, Año).");
+        return;
+      }
+      if (!bajaIsLibre && !bajaIsRetirado && !bajaDestino.trim()) {
+        setFormError("El club de destino es obligatorio para un traspaso.");
+        return;
+      }
+
+      const dayStr = bajaDay.padStart(2, '0');
+      const monthStr = bajaMonth.padStart(2, '0');
+      const fechaStr = `${dayStr}/${monthStr}/${bajaYear}`;
+
+      const updatedPlayer: Player = {
+        ...bajaPlayer,
+        squadStatus: 'baja',
+        fechaBaja: fechaStr,
+        fechaSalida: fechaStr,
+        tipoBaja: bajaIsRetirado ? 'retirado' : bajaIsLibre ? 'libre' : 'traspaso',
+        destino: bajaIsRetirado ? 'Retirado' : bajaIsLibre ? 'Libre' : bajaDestino.trim(),
+        clubBaja: bajaIsRetirado ? 'Retirado' : bajaIsLibre ? 'Libre' : bajaDestino.trim(),
+        montoVenta: bajaIsRetirado || bajaIsLibre ? 0 : (parseInt(bajaMonto) || 0),
+        montoBaja: bajaIsRetirado || bajaIsLibre ? '0' : formatMarketValue(parseInt(bajaMonto) || 0),
+        comentarioBaja: bajaComentario.trim() || undefined
+      };
+
+      onUpdatePlayer(updatedPlayer);
+      setBajaPlayer(null);
       setFormError('');
     }
   };
@@ -2295,7 +2374,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
         <div className="border-b border-slate-800 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="text-sm font-bold text-teal-400 uppercase tracking-wider font-sans flex items-center gap-2">
-              🌱 SECCIÓN DE JUGADORES EN DESARROLLO ({desarrolloPlayers.length} jugadores)
+              🌱 SECCIÓN DE JUGADORES EN DESARROLLO ({filteredDesarrollo.length === desarrolloPlayers.length ? `${desarrolloPlayers.length} jugadores` : `${filteredDesarrollo.length} de ${desarrolloPlayers.length} filtrados`})
             </h3>
             <p className="text-xs text-slate-400">
               Jugadores que forman parte del club pero no requieren de una supervisión constante ni asignación en la matriz de planificación.
@@ -2306,6 +2385,10 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
         {desarrolloPlayers.length === 0 ? (
           <div className="p-8 text-center text-xs text-slate-500 italic bg-slate-900/10 rounded-xl border border-dashed border-slate-800/60">
             No tienes jugadores en desarrollo registrados actualmente. Puedes cambiar el estado de un jugador a "Desarrollo" en la tabla principal para moverlo aquí.
+          </div>
+        ) : filteredDesarrollo.length === 0 ? (
+          <div className="p-8 text-center text-xs text-slate-500 italic bg-slate-900/10 rounded-xl border border-dashed border-slate-800/60">
+            Ningún jugador en desarrollo coincide con los filtros aplicados.
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/20">
@@ -2324,7 +2407,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/40">
-                {desarrolloPlayers.map((p) => (
+                {filteredDesarrollo.map((p) => (
                   <tr key={p.id} className="hover:bg-teal-950/10 transition-colors">
                     <td className="px-3 py-2 text-slate-500 font-sans font-medium text-[10px]">{p.id}</td>
                     <td className="px-3 py-2">
@@ -2410,7 +2493,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
         <div className="border-b border-slate-800 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="text-sm font-bold text-blue-400 uppercase tracking-wider font-sans flex items-center gap-2">
-              ✈️ SECCIÓN DE JUGADORES CEDIDOS ({cedidosPlayers.length} jugadores)
+              ✈️ SECCIÓN DE JUGADORES CEDIDOS ({filteredCedidos.length === cedidosPlayers.length ? `${cedidosPlayers.length} jugadores` : `${filteredCedidos.length} de ${cedidosPlayers.length} filtrados`})
             </h3>
             <p className="text-xs text-slate-400">
               Jugadores prestados a otros equipos que no forman parte del plantel actual, con club de destino, vencimiento y opción de compra.
@@ -2421,6 +2504,10 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
         {cedidosPlayers.length === 0 ? (
           <div className="p-8 text-center text-xs text-slate-500 italic bg-slate-900/10 rounded-xl border border-dashed border-slate-800/60">
             No tienes jugadores cedidos registrados actualmente.
+          </div>
+        ) : filteredCedidos.length === 0 ? (
+          <div className="p-8 text-center text-xs text-slate-500 italic bg-slate-900/10 rounded-xl border border-dashed border-slate-800/60">
+            Ningún jugador cedido coincide con los filtros aplicados.
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/20">
@@ -2440,7 +2527,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/40">
-                {cedidosPlayers.map((p) => (
+                {filteredCedidos.map((p) => (
                   <tr key={p.id} className="hover:bg-blue-950/10 transition-colors">
                     <td className="px-3 py-2 text-slate-500 font-sans font-medium text-[10px]">{p.id}</td>
                     <td className="px-3 py-2">
@@ -2550,10 +2637,10 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
         <div className="border-b border-slate-800 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="text-sm font-bold text-rose-400 uppercase tracking-wider font-sans flex items-center gap-2">
-              📉 SECCIÓN DE BAJAS DEL CLUB ({bajasPlayers.length} jugadores)
+              📉 SECCIÓN DE BAJAS DEL CLUB ({filteredBajas.length === bajasPlayers.length ? `${bajasPlayers.length} jugadores` : `${filteredBajas.length} de ${bajasPlayers.length} filtrados`})
             </h3>
             <p className="text-xs text-slate-400">
-              Jugadores retirados, transferidos o cedidos que ya no pertenecen al plantel y dejeron de formar parte de la tabla principal.
+              Jugadores retirados, transferidos o cedidos que ya no pertenecen al plantel y dejaron de formar parte de la tabla principal.
             </p>
           </div>
         </div>
@@ -2561,6 +2648,10 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
         {bajasPlayers.length === 0 ? (
           <div className="p-8 text-center text-xs text-slate-500 italic bg-slate-900/10 rounded-xl border border-dashed border-slate-800/60">
             No tienes bajas registradas en el club actualmente.
+          </div>
+        ) : filteredBajas.length === 0 ? (
+          <div className="p-8 text-center text-xs text-slate-500 italic bg-slate-900/10 rounded-xl border border-dashed border-slate-800/60">
+            Ninguna baja coincide con los filtros aplicados.
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/20">
@@ -2578,72 +2669,94 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/40">
-                {bajasPlayers.map((p) => (
-                  <tr key={p.id} className="hover:bg-rose-950/10 transition-colors">
-                    <td className="px-3 py-2 text-slate-500 font-sans font-medium text-[10px]">{p.id}</td>
-                    <td className="px-3 py-2">
-                      <div className="font-bold text-slate-100">{p.name}</div>
-                      <div className="text-[10px] text-slate-500 font-sans">{p.position} • {p.age} años</div>
-                    </td>
-                    <td className="px-3 py-2 text-slate-300">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-base">{getFlagEmoji(p.nationality)}</span>
-                        <span>{p.nationality}</span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="text"
-                        placeholder="Ej. 30/06/2026"
-                        value={p.fechaBaja || ''}
-                        onChange={(e) => onUpdatePlayer({ ...p, fechaBaja: e.target.value })}
-                        className="bg-slate-950 border border-slate-850 rounded px-2 py-1 text-xs text-slate-100 w-28 text-center focus:border-rose-500 focus:outline-none font-mono"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="text"
-                        placeholder="Ej. €12M"
-                        value={p.montoBaja || ''}
-                        onChange={(e) => onUpdatePlayer({ ...p, montoBaja: e.target.value })}
-                        className="bg-slate-950 border border-slate-850 rounded px-2 py-1 text-xs text-slate-100 w-28 focus:border-rose-500 focus:outline-none"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="text"
-                        placeholder="Ej. Galatasaray"
-                        value={p.clubBaja || ''}
-                        onChange={(e) => onUpdatePlayer({ ...p, clubBaja: e.target.value })}
-                        className="bg-slate-950 border border-slate-850 rounded px-2 py-1 text-xs text-slate-100 w-36 focus:border-rose-500 focus:outline-none"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="text"
-                        placeholder="Cláusulas o motivos..."
-                        value={p.comentarioBaja || ''}
-                        onChange={(e) => onUpdatePlayer({ ...p, comentarioBaja: e.target.value })}
-                        className="bg-slate-950 border border-slate-850 rounded px-2 py-1 text-xs text-slate-100 w-full min-w-[150px] focus:border-rose-500 focus:outline-none"
-                      />
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <div className="flex justify-end gap-1.5">
-                        <button
-                          onClick={() => {
-                            onUpdatePlayer({
-                              ...p,
-                              squadStatus: 'no_asignado',
-                              fechaBaja: undefined,
-                              montoBaja: undefined,
-                              clubBaja: undefined,
-                              comentarioBaja: undefined
+                {filteredBajas.map((p) => {
+                  const displayDate = p.fechaSalida || p.fechaBaja || '';
+                  const displayDestino = p.destino || p.clubBaja || '';
+                  let displayMonto = '';
+                  if (p.montoVenta !== undefined) {
+                    displayMonto = String(p.montoVenta);
+                  } else {
+                    displayMonto = p.montoBaja || '';
+                  }
+
+                  return (
+                    <tr key={p.id} className="hover:bg-rose-950/10 transition-colors">
+                      <td className="px-3 py-2 text-slate-500 font-sans font-medium text-[10px]">{p.id}</td>
+                      <td className="px-3 py-2">
+                        <div className="font-bold text-slate-100">{p.name}</div>
+                        <div className="text-[10px] text-slate-500 font-sans">{p.position} • {p.age} años</div>
+                      </td>
+                      <td className="px-3 py-2 text-slate-300">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-base">{getFlagEmoji(p.nationality)}</span>
+                          <span>{p.nationality}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="text"
+                          placeholder="Ej. 30/06/2026"
+                          value={displayDate}
+                          onChange={(e) => onUpdatePlayer({ ...p, fechaSalida: e.target.value, fechaBaja: e.target.value })}
+                          className="bg-slate-950 border border-slate-850 rounded px-2 py-1 text-xs text-slate-100 w-28 text-center focus:border-rose-500 focus:outline-none font-mono"
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="text"
+                          placeholder="Ej. 12000000"
+                          value={displayMonto}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const num = parseInt(val.replace(/\D/g, ''));
+                            onUpdatePlayer({ 
+                              ...p, 
+                              montoVenta: isNaN(num) ? undefined : num, 
+                              montoBaja: val 
                             });
                           }}
-                          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded text-[10px] transition"
-                        >
-                          Reincorporar
-                        </button>
+                          className="bg-slate-950 border border-slate-850 rounded px-2 py-1 text-xs text-slate-100 w-28 focus:border-rose-500 focus:outline-none"
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="text"
+                          placeholder="Ej. Galatasaray"
+                          value={displayDestino}
+                          onChange={(e) => onUpdatePlayer({ ...p, destino: e.target.value, clubBaja: e.target.value })}
+                          className="bg-slate-950 border border-slate-850 rounded px-2 py-1 text-xs text-slate-100 w-36 focus:border-rose-500 focus:outline-none"
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="text"
+                          placeholder="Cláusulas o motivos..."
+                          value={p.comentarioBaja || ''}
+                          onChange={(e) => onUpdatePlayer({ ...p, comentarioBaja: e.target.value })}
+                          className="bg-slate-950 border border-slate-850 rounded px-2 py-1 text-xs text-slate-100 w-full min-w-[150px] focus:border-rose-500 focus:outline-none"
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <div className="flex justify-end gap-1.5">
+                          <button
+                            onClick={() => {
+                              onUpdatePlayer({
+                                ...p,
+                                squadStatus: 'no_asignado',
+                                fechaBaja: undefined,
+                                montoBaja: undefined,
+                                clubBaja: undefined,
+                                comentarioBaja: undefined,
+                                fechaSalida: undefined,
+                                montoVenta: undefined,
+                                destino: undefined,
+                                tipoBaja: undefined
+                              });
+                            }}
+                            className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded text-[10px] transition"
+                          >
+                            Reincorporar
+                          </button>
                         {confirmDeleteId === p.id ? (
                           <div className="flex items-center gap-1 bg-rose-950 border border-rose-500/30 p-1 rounded">
                             <span className="text-[9px] font-bold text-rose-300 font-sans">¿Eliminar permanentemente?</span>
@@ -2677,7 +2790,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                       </div>
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>

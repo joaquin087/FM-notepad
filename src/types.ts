@@ -29,6 +29,16 @@ export interface Player {
   clubBaja?: string;
   comentarioBaja?: string;
 
+  // New transfer history fields
+  fechaLlegada?: string; // dd/mm/yyyy
+  fechaSalida?: string; // dd/mm/yyyy
+  montoCompra?: number; // Integer numeric fee
+  montoVenta?: number; // Integer numeric fee
+  canterano?: boolean; // Club homegrown indicator
+  origen?: string; // Club of origin
+  destino?: string; // Club of destination
+  tipoBaja?: 'traspaso' | 'libre' | 'retirado'; // Type of release/transfer
+
   // Cedidos fields
   clubPrestamo?: string; // loan destination team
   finPrestamo?: string; // loan end year / date
