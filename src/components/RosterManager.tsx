@@ -25,6 +25,18 @@ const getFMStarsAndColor = (pct: number) => {
   }
 };
 
+const CanteranoBadge = () => (
+  <span className="inline-flex items-center ml-1.5 shrink-0" title="Canterano de las inferiores del club">
+    <svg className="w-3.5 h-3.5" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M50 12 L85 22 V55 C85 76 50 90 50 90 C50 90 15 76 15 55 V22 Z" fill="#022c22" stroke="#10b981" strokeWidth="6" strokeLinejoin="round" />
+      <path d="M50 15 V87 C50 87 18 73.5 18 55 V24.5 Z" fill="#047857" opacity="0.3" />
+      <circle cx="50" cy="48" r="18" fill="#0f172a" stroke="#10b981" strokeWidth="4.5" />
+      <path d="M50 30 V66 M32 48 H68" stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
+      <path d="M37.5 35.5 L62.5 60.5 M37.5 60.5 L62.5 35.5" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  </span>
+);
+
 export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePlayer, onResetToDefaults, onDeleteAllPlayers, gameYear, gameDate }: RosterManagerProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [positionFilter, setPositionFilter] = useState('ALL');
@@ -1675,11 +1687,12 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                 </div>
 
                 {/* Información de Fichaje / Llegada */}
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
                   <span className="text-[10px] font-sans text-emerald-400 font-bold uppercase tracking-wider block">
                     📋 Información de Fichaje / Llegada
                   </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
                     {/* Fecha de Llegada */}
                     <div>
                       <label className="text-[10px] text-slate-400 block mb-1">Fecha de Llegada (DD/MM/AAAA) *</label>
@@ -1690,7 +1703,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                           placeholder="DD"
                           value={llegadaDay}
                           onChange={(e) => setLlegadaDay(e.target.value.replace(/\D/g, ''))}
-                          className="w-12 bg-slate-900 border border-slate-800 rounded p-1 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
+                          className="w-12 bg-slate-900 border border-slate-800 rounded p-1.5 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
                         />
                         <span className="text-slate-600">/</span>
                         <input
@@ -1699,7 +1712,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                           placeholder="MM"
                           value={llegadaMonth}
                           onChange={(e) => setLlegadaMonth(e.target.value.replace(/\D/g, ''))}
-                          className="w-12 bg-slate-900 border border-slate-800 rounded p-1 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
+                          className="w-12 bg-slate-900 border border-slate-800 rounded p-1.5 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
                         />
                         <span className="text-slate-600">/</span>
                         <input
@@ -1708,22 +1721,9 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                           placeholder="AAAA"
                           value={llegadaYear}
                           onChange={(e) => setLlegadaYear(e.target.value.replace(/\D/g, ''))}
-                          className="w-20 bg-slate-900 border border-slate-800 rounded p-1 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
+                          className="w-20 bg-slate-900 border border-slate-800 rounded p-1.5 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
                         />
                       </div>
-                    </div>
-
-                    {/* Canterano Checkbox */}
-                    <div className="flex items-center pt-5">
-                      <label className="flex items-center gap-2 cursor-pointer text-slate-300 font-sans">
-                        <input
-                          type="checkbox"
-                          checked={newCanterano}
-                          onChange={(e) => setNewCanterano(e.target.checked)}
-                          className="w-4 h-4 rounded border-slate-800 text-emerald-600 focus:ring-emerald-500 bg-slate-950"
-                        />
-                        <span className="text-[11px] font-bold text-slate-200">🌱 Canterano del club</span>
-                      </label>
                     </div>
 
                     {/* Club de Origen */}
@@ -1761,6 +1761,19 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                         />
                       )}
                     </div>
+                  </div>
+
+                  {/* Canterano Checkbox Row - Placed underneath */}
+                  <div className="pt-2.5 border-t border-slate-900">
+                    <label className="inline-flex items-center gap-2 cursor-pointer text-slate-300 font-sans select-none hover:text-white transition">
+                      <input
+                        type="checkbox"
+                        checked={newCanterano}
+                        onChange={(e) => setNewCanterano(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-800 text-emerald-600 focus:ring-emerald-500 bg-slate-900 cursor-pointer"
+                      />
+                      <span className="text-[11px] font-bold text-slate-200">🌱 Canterano del club (formado en inferiores)</span>
+                    </label>
                   </div>
                 </div>
 
@@ -2234,11 +2247,12 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
               )}
 
               {/* Información de Fichaje / Llegada */}
-              <div className="md:col-span-2 bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+              <div className="md:col-span-2 bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
                 <span className="text-[10px] font-sans text-emerald-400 font-bold uppercase tracking-wider block">
                   📋 Información de Fichaje / Llegada
                 </span>
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
                   {/* Fecha de Llegada */}
                   <div>
                     <label className="text-[10px] text-slate-400 block mb-1">Fecha de Llegada (DD/MM/AAAA) *</label>
@@ -2249,7 +2263,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                         placeholder="DD"
                         value={editLlegadaDay}
                         onChange={(e) => setEditLlegadaDay(e.target.value.replace(/\D/g, ''))}
-                        className="w-12 bg-slate-900 border border-slate-800 rounded p-1 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
+                        className="w-12 bg-slate-900 border border-slate-800 rounded p-1.5 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
                       />
                       <span className="text-slate-600">/</span>
                       <input
@@ -2258,7 +2272,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                         placeholder="MM"
                         value={editLlegadaMonth}
                         onChange={(e) => setEditLlegadaMonth(e.target.value.replace(/\D/g, ''))}
-                        className="w-12 bg-slate-900 border border-slate-800 rounded p-1 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
+                        className="w-12 bg-slate-900 border border-slate-800 rounded p-1.5 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
                       />
                       <span className="text-slate-600">/</span>
                       <input
@@ -2267,22 +2281,9 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                         placeholder="AAAA"
                         value={editLlegadaYear}
                         onChange={(e) => setEditLlegadaYear(e.target.value.replace(/\D/g, ''))}
-                        className="w-20 bg-slate-900 border border-slate-800 rounded p-1 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
+                        className="w-20 bg-slate-900 border border-slate-800 rounded p-1.5 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
                       />
                     </div>
-                  </div>
-
-                  {/* Canterano Checkbox */}
-                  <div className="flex items-center pt-5">
-                    <label className="flex items-center gap-2 cursor-pointer text-slate-300 font-sans">
-                      <input
-                        type="checkbox"
-                        checked={editCanterano}
-                        onChange={(e) => setEditCanterano(e.target.checked)}
-                        className="w-4 h-4 rounded border-slate-800 text-emerald-600 focus:ring-emerald-500 bg-slate-950"
-                      />
-                      <span className="text-[11px] font-bold text-slate-200">🌱 Canterano del club</span>
-                    </label>
                   </div>
 
                   {/* Club de Origen */}
@@ -2320,6 +2321,19 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                       />
                     )}
                   </div>
+                </div>
+
+                {/* Canterano Checkbox Row - Placed underneath */}
+                <div className="pt-2.5 border-t border-slate-900">
+                  <label className="inline-flex items-center gap-2 cursor-pointer text-slate-300 font-sans select-none hover:text-white transition">
+                    <input
+                      type="checkbox"
+                      checked={editCanterano}
+                      onChange={(e) => setEditCanterano(e.target.checked)}
+                      className="w-4 h-4 rounded border-slate-800 text-emerald-600 focus:ring-emerald-500 bg-slate-900 cursor-pointer"
+                    />
+                    <span className="text-[11px] font-bold text-slate-200">🌱 Canterano del club (formado en inferiores)</span>
+                  </label>
                 </div>
               </div>
 
@@ -2571,12 +2585,12 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
         <table className="min-w-full divide-y divide-slate-800 text-left text-xs font-sans">
           <thead className="bg-slate-900/80 text-slate-400 uppercase tracking-wider font-sans font-semibold text-[10px] whitespace-nowrap">
             <tr>
-              {renderSortHeader('name', 'Nombre', 'w-[160px]')}
+              {renderSortHeader('name', 'Nombre', 'w-[180px]')}
               {renderSortHeader('nationality', 'Nac', 'w-[50px]')}
               {renderSortHeader('position', 'Pos', 'w-[70px]')}
-              {renderSortHeader('age', 'Edad (F. Nacimiento)', 'w-[150px]')}
+              {renderSortHeader('age', 'Edad (DOB)', 'w-[110px]')}
               {renderSortHeader('wage', 'Sueldo Anual', 'w-[105px]')}
-              {renderSortHeader('marketValue', 'Valor Mercado', 'w-[105px]')}
+              {renderSortHeader('marketValue', 'VALOR', 'w-[80px]')}
               {renderSortHeader('ca', 'Calidad (CA)', 'w-[110px]')}
               {renderSortHeader('pa', 'Potencial (PA)', 'w-[110px]')}
               {renderSortHeader('contractEnd', 'Fin Contrato', 'w-[130px]')}
@@ -2608,9 +2622,15 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                         : ''
                     }`}
                   >
-                    <td className="px-3 py-2 font-medium text-slate-100 max-w-[150px] truncate" title={player.name}>
-                      <div className="flex items-center gap-1.5">
-                        <span className="truncate">{player.name}</span>
+                    <td className="px-3 py-2 font-medium text-slate-100 w-[180px] max-w-[180px]" title={player.name}>
+                      <div className="flex items-center gap-1.5 overflow-hidden">
+                        <span 
+                          className="truncate"
+                          style={{ fontSize: player.name.length > 20 ? '10.8px' : '12px' }}
+                        >
+                          {player.name}
+                        </span>
+                        {player.canterano && <CanteranoBadge />}
                       </div>
                     </td>
                     <td className="px-3 py-2 text-base font-sans" title={player.nationality}>
@@ -2787,7 +2807,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                   <th className="px-3 py-2.5 font-semibold">Calidad (CA)</th>
                   <th className="px-3 py-2.5 font-semibold">Potencial (PA)</th>
                   <th className="px-3 py-2.5 font-semibold">Sueldo Anual</th>
-                  <th className="px-3 py-2.5 font-semibold">Valor Mercado</th>
+                  <th className="px-3 py-2.5 font-semibold">VALOR</th>
                   <th className="px-3 py-2.5 font-semibold">Fin Contrato</th>
                   <th className="px-3 py-2.5 font-semibold text-right">Acciones</th>
                 </tr>
@@ -2797,7 +2817,10 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                   <tr key={p.id} className="hover:bg-teal-950/10 transition-colors">
                     <td className="px-3 py-2 text-slate-500 font-sans font-medium text-[10px]">{p.id}</td>
                     <td className="px-3 py-2">
-                      <div className="font-bold text-slate-100">{p.name}</div>
+                      <div className="font-bold text-slate-100 flex items-center gap-1.5 overflow-hidden">
+                        <span style={{ fontSize: p.name.length > 20 ? '10.8px' : '12px' }}>{p.name}</span>
+                        {p.canterano && <CanteranoBadge />}
+                      </div>
                       <div className="text-[10px] text-slate-500 font-sans">{p.position} • {p.age} años</div>
                     </td>
                     <td className="px-3 py-2 text-slate-300">
@@ -2926,7 +2949,10 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                   <tr key={p.id} className="hover:bg-blue-950/10 transition-colors">
                     <td className="px-3 py-2 text-slate-500 font-sans font-medium text-[10px]">{p.id}</td>
                     <td className="px-3 py-2">
-                      <div className="font-bold text-slate-100">{p.name}</div>
+                      <div className="font-bold text-slate-100 flex items-center gap-1.5 overflow-hidden">
+                        <span style={{ fontSize: p.name.length > 20 ? '10.8px' : '12px' }}>{p.name}</span>
+                        {p.canterano && <CanteranoBadge />}
+                      </div>
                       <div className="text-[10px] text-slate-500 font-sans">{p.position} • {p.age} años</div>
                     </td>
                     <td className="px-3 py-2 text-slate-300">
@@ -3087,7 +3113,10 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                     <tr key={p.id} className="hover:bg-rose-950/10 transition-colors">
                       <td className="px-3 py-2 text-slate-500 font-sans font-medium text-[10px]">{p.id}</td>
                       <td className="px-3 py-2">
-                        <div className="font-bold text-slate-100">{p.name}</div>
+                        <div className="font-bold text-slate-100 flex items-center gap-1.5 overflow-hidden">
+                          <span style={{ fontSize: p.name.length > 20 ? '10.8px' : '12px' }}>{p.name}</span>
+                          {p.canterano && <CanteranoBadge />}
+                        </div>
                         <div className="text-[10px] text-slate-500 font-sans">{p.position} • {p.age} años</div>
                       </td>
                       <td className="px-3 py-2 text-slate-300">
