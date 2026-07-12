@@ -2101,6 +2101,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                   <option value="venta">💰 Transferibles</option>
                   <option value="desarrollo">🌱 Desarrollo</option>
                   <option value="descartes">❌ Descarte</option>
+                  <option value="baja">📉 Dado de Baja</option>
                 </select>
               </div>
 
@@ -2821,7 +2822,16 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                       {calculateContractYearsRemainingPrecise(p.contractEnd, gameDate)}
                     </td>
                     <td className="px-3 py-2 text-right">
-                      <div className="flex justify-end gap-1.5">
+                      <div className="flex justify-end gap-1.5 items-center">
+                        <button
+                          onClick={() => {
+                            handleEditClick(p);
+                          }}
+                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                          title="Editar ficha"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           onClick={() => {
                             onUpdatePlayer({
@@ -2962,7 +2972,16 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                       />
                     </td>
                     <td className="px-3 py-2 text-right">
-                      <div className="flex justify-end gap-1.5">
+                      <div className="flex justify-end gap-1.5 items-center">
+                        <button
+                          onClick={() => {
+                            handleEditClick(p);
+                          }}
+                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                          title="Editar ficha"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           onClick={() => {
                             onUpdatePlayer({
@@ -3122,7 +3141,16 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                         />
                       </td>
                       <td className="px-3 py-2 text-right">
-                        <div className="flex justify-end gap-1.5">
+                        <div className="flex justify-end gap-1.5 items-center">
+                          <button
+                            onClick={() => {
+                              handleEditClick(p);
+                            }}
+                            className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                            title="Editar ficha"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
                           <button
                             onClick={() => {
                               onUpdatePlayer({
