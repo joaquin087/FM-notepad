@@ -543,6 +543,31 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
       setEditPrestamoMonth('');
       setEditPrestamoYear('');
     }
+
+    // Parse fechaLlegada
+    let lD = '01';
+    let lM = '07';
+    let lY = '2026';
+    if (player.fechaLlegada) {
+      const parts = player.fechaLlegada.split(/[\.\-\/]+/);
+      if (parts.length === 3) {
+        lD = parts[0];
+        lM = parts[1];
+        lY = parts[2];
+      }
+    } else {
+      const parts = gameDate.split('/');
+      lD = parts[0] || '01';
+      lM = parts[1] || '07';
+      lY = parts[2] || '2026';
+    }
+    setEditLlegadaDay(lD);
+    setEditLlegadaMonth(lM);
+    setEditLlegadaYear(lY);
+
+    setEditOrigen(player.origen || '');
+    setEditMontoCompra(player.montoCompra !== undefined ? String(player.montoCompra) : '0');
+    setEditCanterano(!!player.canterano);
   };
 
   const handleSaveEdit = () => {
@@ -671,6 +696,18 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
         }
       }
 
+      // Arrival validations
+      let finalOrigen = editOrigen.trim();
+      let finalMontoCompra = 0;
+      if (editCanterano) {
+        finalOrigen = 'Inferiores del club';
+        finalMontoCompra = 0;
+      } else {
+        const mcInt = parseInt(editMontoCompra, 10);
+        finalMontoCompra = isNaN(mcInt) ? 0 : mcInt;
+      }
+      const finalLlegada = `${editLlegadaDay.padStart(2, '0')}/${editLlegadaMonth.padStart(2, '0')}/${editLlegadaYear}`;
+
       const updatedPlayer: Player = {
         ...editingPlayer,
         name: finalName,
@@ -686,6 +723,11 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
         bestPotRating: parsedPa.rawRating,
         fechaBaja: finalFechaBaja,
         finPrestamo: finalFinPrestamo,
+        // Arrival fields
+        fechaLlegada: finalLlegada,
+        origen: finalOrigen,
+        montoCompra: finalMontoCompra,
+        canterano: editCanterano,
       };
 
       onUpdatePlayer(updatedPlayer);
@@ -921,6 +963,18 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
       ? `${nacionalidad1.trim()} / ${nacionalidad2.trim()}`
       : nacionalidad1.trim();
 
+    // Arrival validations
+    let finalOrigen = newOrigen.trim();
+    let finalMontoCompra = 0;
+    if (newCanterano) {
+      finalOrigen = 'Inferiores del club';
+      finalMontoCompra = 0;
+    } else {
+      const mcInt = parseInt(newMontoCompra, 10);
+      finalMontoCompra = isNaN(mcInt) ? 0 : mcInt;
+    }
+    const finalLlegada = `${llegadaDay.padStart(2, '0')}/${llegadaMonth.padStart(2, '0')}/${llegadaYear}`;
+
     onAddPlayer({
       ...newPlayer,
       name: fullName,
@@ -935,7 +989,12 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
       nationality: combinedNationality,
       marketValue: formattedMarketValue,
       wage: formattedWageStr,
-      club: 'N/A'
+      club: 'N/A',
+      // Arrival fields
+      fechaLlegada: finalLlegada,
+      origen: finalOrigen,
+      montoCompra: finalMontoCompra,
+      canterano: newCanterano,
     });
     
     setIsAdding(false);
@@ -974,6 +1033,15 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
     setBirthMonth('12');
     setBirthYear('2001');
     setNewMarketValueInput('1500000');
+
+    // Reset arrival states
+    const dateParts = gameDate.split('/');
+    setLlegadaDay(dateParts[0] || '01');
+    setLlegadaMonth(dateParts[1] || '07');
+    setLlegadaYear(dateParts[2] || '2026');
+    setNewOrigen('');
+    setNewMontoCompra('0');
+    setNewCanterano(false);
   };
 
   // Helper to render beautiful yellow or silver stars with percentage
@@ -1606,6 +1674,96 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                   </div>
                 </div>
 
+                {/* Información de Fichaje / Llegada */}
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                  <span className="text-[10px] font-sans text-emerald-400 font-bold uppercase tracking-wider block">
+                    📋 Información de Fichaje / Llegada
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                    {/* Fecha de Llegada */}
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Fecha de Llegada (DD/MM/AAAA) *</label>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          maxLength={2}
+                          placeholder="DD"
+                          value={llegadaDay}
+                          onChange={(e) => setLlegadaDay(e.target.value.replace(/\D/g, ''))}
+                          className="w-12 bg-slate-900 border border-slate-800 rounded p-1 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
+                        />
+                        <span className="text-slate-600">/</span>
+                        <input
+                          type="text"
+                          maxLength={2}
+                          placeholder="MM"
+                          value={llegadaMonth}
+                          onChange={(e) => setLlegadaMonth(e.target.value.replace(/\D/g, ''))}
+                          className="w-12 bg-slate-900 border border-slate-800 rounded p-1 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
+                        />
+                        <span className="text-slate-600">/</span>
+                        <input
+                          type="text"
+                          maxLength={4}
+                          placeholder="AAAA"
+                          value={llegadaYear}
+                          onChange={(e) => setLlegadaYear(e.target.value.replace(/\D/g, ''))}
+                          className="w-20 bg-slate-900 border border-slate-800 rounded p-1 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Canterano Checkbox */}
+                    <div className="flex items-center pt-5">
+                      <label className="flex items-center gap-2 cursor-pointer text-slate-300 font-sans">
+                        <input
+                          type="checkbox"
+                          checked={newCanterano}
+                          onChange={(e) => setNewCanterano(e.target.checked)}
+                          className="w-4 h-4 rounded border-slate-800 text-emerald-600 focus:ring-emerald-500 bg-slate-950"
+                        />
+                        <span className="text-[11px] font-bold text-slate-200">🌱 Canterano del club</span>
+                      </label>
+                    </div>
+
+                    {/* Club de Origen */}
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Club de Origen</label>
+                      {newCanterano ? (
+                        <div className="w-full bg-slate-900 border border-slate-800/50 rounded p-1.5 text-slate-500 font-semibold italic line-through">
+                          Inferiores del club
+                        </div>
+                      ) : (
+                        <input
+                          type="text"
+                          placeholder="Ej. Boca Juniors"
+                          value={newOrigen}
+                          onChange={(e) => setNewOrigen(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-800 rounded p-1.5 text-slate-100 focus:outline-none focus:border-emerald-600 font-semibold"
+                        />
+                      )}
+                    </div>
+
+                    {/* Monto de Compra */}
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Monto de Compra (€)</label>
+                      {newCanterano ? (
+                        <div className="w-full bg-slate-900 border border-slate-800/50 rounded p-1.5 text-slate-500 font-bold font-mono italic line-through">
+                          Inferiores del club
+                        </div>
+                      ) : (
+                        <input
+                          type="text"
+                          placeholder="Ej. 1500000"
+                          value={newMontoCompra}
+                          onChange={(e) => setNewMontoCompra(e.target.value.replace(/\D/g, ''))}
+                          className="w-full bg-slate-900 border border-slate-800 rounded p-1.5 text-slate-100 font-mono font-bold focus:outline-none focus:border-emerald-600"
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Confirm buttons */}
                 <div className="flex justify-end gap-2 text-xs pt-2 border-t border-slate-800/60">
                   <button
@@ -1943,7 +2101,6 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                   <option value="venta">💰 Transferibles</option>
                   <option value="desarrollo">🌱 Desarrollo</option>
                   <option value="descartes">❌ Descarte</option>
-                  <option value="baja">📉 Baja del Club</option>
                 </select>
               </div>
 
@@ -2075,6 +2232,96 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                 </div>
               )}
 
+              {/* Información de Fichaje / Llegada */}
+              <div className="md:col-span-2 bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                <span className="text-[10px] font-sans text-emerald-400 font-bold uppercase tracking-wider block">
+                  📋 Información de Fichaje / Llegada
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                  {/* Fecha de Llegada */}
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Fecha de Llegada (DD/MM/AAAA) *</label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        maxLength={2}
+                        placeholder="DD"
+                        value={editLlegadaDay}
+                        onChange={(e) => setEditLlegadaDay(e.target.value.replace(/\D/g, ''))}
+                        className="w-12 bg-slate-900 border border-slate-800 rounded p-1 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
+                      />
+                      <span className="text-slate-600">/</span>
+                      <input
+                        type="text"
+                        maxLength={2}
+                        placeholder="MM"
+                        value={editLlegadaMonth}
+                        onChange={(e) => setEditLlegadaMonth(e.target.value.replace(/\D/g, ''))}
+                        className="w-12 bg-slate-900 border border-slate-800 rounded p-1 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
+                      />
+                      <span className="text-slate-600">/</span>
+                      <input
+                        type="text"
+                        maxLength={4}
+                        placeholder="AAAA"
+                        value={editLlegadaYear}
+                        onChange={(e) => setEditLlegadaYear(e.target.value.replace(/\D/g, ''))}
+                        className="w-20 bg-slate-900 border border-slate-800 rounded p-1 text-center font-mono text-slate-100 focus:outline-none focus:border-emerald-600"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Canterano Checkbox */}
+                  <div className="flex items-center pt-5">
+                    <label className="flex items-center gap-2 cursor-pointer text-slate-300 font-sans">
+                      <input
+                        type="checkbox"
+                        checked={editCanterano}
+                        onChange={(e) => setEditCanterano(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-800 text-emerald-600 focus:ring-emerald-500 bg-slate-950"
+                      />
+                      <span className="text-[11px] font-bold text-slate-200">🌱 Canterano del club</span>
+                    </label>
+                  </div>
+
+                  {/* Club de Origen */}
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Club de Origen</label>
+                    {editCanterano ? (
+                      <div className="w-full bg-slate-900 border border-slate-800/50 rounded p-1.5 text-slate-500 font-semibold italic line-through">
+                        Inferiores del club
+                      </div>
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder="Ej. Boca Juniors"
+                        value={editOrigen}
+                        onChange={(e) => setEditOrigen(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-900 rounded p-1.5 text-slate-100 focus:outline-none focus:border-emerald-600 font-semibold"
+                      />
+                    )}
+                  </div>
+
+                  {/* Monto de Compra */}
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Monto de Compra (€)</label>
+                    {editCanterano ? (
+                      <div className="w-full bg-slate-900 border border-slate-800/50 rounded p-1.5 text-slate-500 font-bold font-mono italic line-through">
+                        Inferiores del club
+                      </div>
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder="Ej. 1500000"
+                        value={editMontoCompra}
+                        onChange={(e) => setEditMontoCompra(e.target.value.replace(/\D/g, ''))}
+                        className="w-full bg-slate-900 border border-slate-800 rounded p-1.5 text-slate-100 font-mono font-bold focus:outline-none focus:border-emerald-600"
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="md:col-span-2">
                 <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Notas del Mánager</label>
                 <textarea
@@ -2175,6 +2422,149 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
         </div>
       )}
 
+      {/* Player Release (Dar de Baja) Modal Overlay */}
+      {bajaPlayer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  📉 Dar de Baja a Jugador
+                </h3>
+                <span className="text-[11px] font-sans text-rose-400 font-bold">{bajaPlayer.name} ({bajaPlayer.position})</span>
+              </div>
+              <button onClick={() => setBajaPlayer(null)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {formError && (
+              <div className="bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs px-3 py-2 rounded-lg flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{formError}</span>
+              </div>
+            )}
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Tipo de Baja</label>
+                <select
+                  value={bajaIsRetirado ? 'retirado' : bajaIsLibre ? 'libre' : 'traspaso'}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'retirado') {
+                      setBajaIsRetirado(true);
+                      setBajaIsLibre(false);
+                      setBajaDestino('Retirado');
+                      setBajaMonto('0');
+                    } else if (val === 'libre') {
+                      setBajaIsRetirado(false);
+                      setBajaIsLibre(true);
+                      setBajaDestino('Libre');
+                      setBajaMonto('0');
+                    } else {
+                      setBajaIsRetirado(false);
+                      setBajaIsLibre(false);
+                      setBajaDestino('');
+                      setBajaMonto('0');
+                    }
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1 cursor-pointer focus:border-rose-600 focus:outline-none"
+                >
+                  <option value="traspaso">💰 Traspaso (Venta)</option>
+                  <option value="libre">🆓 Carta de Libertad (Libre)</option>
+                  <option value="retirado">👟 Retiro (Retirado)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans block">Fecha de Baja (Día / Mes / Año)</label>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <input
+                    type="text"
+                    maxLength={2}
+                    placeholder="DD"
+                    value={bajaDay}
+                    onChange={(e) => setBajaDay(e.target.value.replace(/\D/g, ''))}
+                    className="w-12 bg-slate-950 border border-slate-800 rounded p-2 text-center font-mono text-slate-100 focus:border-rose-600 focus:outline-none"
+                  />
+                  <span className="text-slate-600">/</span>
+                  <input
+                    type="text"
+                    maxLength={2}
+                    placeholder="MM"
+                    value={bajaMonth}
+                    onChange={(e) => setBajaMonth(e.target.value.replace(/\D/g, ''))}
+                    className="w-12 bg-slate-950 border border-slate-800 rounded p-2 text-center font-mono text-slate-100 focus:border-rose-600 focus:outline-none"
+                  />
+                  <span className="text-slate-600">/</span>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    placeholder="AAAA"
+                    value={bajaYear}
+                    onChange={(e) => setBajaYear(e.target.value.replace(/\D/g, ''))}
+                    className="w-20 bg-slate-950 border border-slate-800 rounded p-2 text-center font-mono text-slate-100 focus:border-rose-600 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Club de Destino</label>
+                <input
+                  type="text"
+                  placeholder={bajaIsRetirado ? 'Retirado' : bajaIsLibre ? 'Libre' : 'Ej. Galatasaray, Boca Juniors...'}
+                  value={bajaDestino}
+                  disabled={bajaIsLibre || bajaIsRetirado}
+                  onChange={(e) => setBajaDestino(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1 focus:border-rose-600 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Monto de Venta / Traspaso (€)</label>
+                <input
+                  type="text"
+                  placeholder="Ej. 1.5M o 1500000"
+                  value={bajaMonto}
+                  disabled={bajaIsLibre || bajaIsRetirado}
+                  onChange={(e) => setBajaMonto(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1 focus:border-rose-600 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed font-mono font-bold"
+                />
+                {!bajaIsLibre && !bajaIsRetirado && (
+                  <p className="text-[10px] text-slate-500 mt-0.5 font-sans">Monto recibido por el club. Puede usar abreviaciones como K o M.</p>
+                )}
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 font-sans">Comentarios / Notas adicionales</label>
+                <textarea
+                  value={bajaComentario}
+                  onChange={(e) => setBajaComentario(e.target.value)}
+                  placeholder="Ej. Traspaso acordado con bonus por objetivos..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-100 mt-1 h-16 resize-none focus:border-rose-600 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 text-xs pt-2 border-t border-slate-800/60">
+              <button
+                onClick={() => setBajaPlayer(null)}
+                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmBaja}
+                className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold transition"
+              >
+                Confirmar Baja
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Roster Table */}
       <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
         <table className="min-w-full divide-y divide-slate-800 text-left text-xs font-sans">
@@ -2268,27 +2658,20 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                     </td>
                     <td className="px-3 py-2 text-right">
                       <div className="flex justify-end gap-1.5 items-center">
-                        {confirmBajaId === player.id ? (
+                        {confirmDeleteId === player.id ? (
                           <div className="flex items-center gap-1 bg-rose-950/80 border border-rose-500/30 p-1 rounded">
-                            <span className="text-[10px] font-bold text-rose-300 px-1 font-sans">¿Baja?</span>
+                            <span className="text-[10px] font-bold text-rose-300 px-1 font-sans">¿Eliminar permanentemente?</span>
                             <button
                               onClick={() => {
-                                onUpdatePlayer({
-                                  ...player,
-                                  squadStatus: 'baja',
-                                  fechaBaja: String(new Date().getFullYear()),
-                                  montoBaja: player.saleValue || 'N/A',
-                                  clubBaja: 'N/A',
-                                  comentarioBaja: 'Dado de baja'
-                                });
-                                setConfirmBajaId(null);
+                                onDeletePlayer(player.id);
+                                setConfirmDeleteId(null);
                               }}
                               className="bg-rose-600 hover:bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded font-bold transition font-sans"
                             >
                               Sí
                             </button>
                             <button
-                              onClick={() => setConfirmBajaId(null)}
+                              onClick={() => setConfirmDeleteId(null)}
                               className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[9px] px-1.5 py-0.5 rounded font-medium transition font-sans"
                             >
                               No
@@ -2300,15 +2683,10 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                             <select
                               value={player.squadStatus}
                               onChange={(e) => {
-                                const val = e.target.value as Player['squadStatus'];
-                                if (val === 'baja') {
-                                  setConfirmBajaId(player.id);
-                                } else {
-                                  onUpdatePlayer({
-                                    ...player,
-                                    squadStatus: val
-                                  });
-                                }
+                                onUpdatePlayer({
+                                  ...player,
+                                  squadStatus: e.target.value as Player['squadStatus']
+                                });
                               }}
                               className="bg-slate-900 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-300 font-sans focus:outline-none focus:border-slate-700 cursor-pointer"
                             >
@@ -2322,13 +2700,11 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                               <option value="venta">💰 Transferibles</option>
                               <option value="desarrollo">🌱 Desarrollo</option>
                               <option value="descartes">❌ Descarte</option>
-                              <option value="baja">📉 Dar de Baja</option>
                             </select>
 
                             <button
                               onClick={() => {
                                 handleEditClick(player);
-                                setConfirmBajaId(null);
                               }}
                               className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
                               title="Editar ficha"
@@ -2339,7 +2715,6 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                             <button
                               onClick={() => {
                                 handleRenewClick(player);
-                                setConfirmBajaId(null);
                               }}
                               className="p-1 rounded bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-900/30 transition"
                               title="Renovar Contrato"
@@ -2349,10 +2724,20 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
 
                             <button
                               onClick={() => {
-                                setConfirmBajaId(player.id);
+                                handleBajaClick(player);
                               }}
-                              className="p-1 rounded bg-rose-950 hover:bg-rose-900 text-rose-400 transition"
-                              title="Mandar a Bajas"
+                              className="p-1 rounded bg-amber-950 hover:bg-amber-900 text-amber-400 border border-amber-900/30 transition"
+                              title="Dar de baja"
+                            >
+                              <UserMinus className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setConfirmDeleteId(player.id);
+                              }}
+                              className="p-1 rounded bg-rose-950/40 hover:bg-rose-900 text-rose-400 border border-rose-900/20 transition"
+                              title="Eliminar permanentemente"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
