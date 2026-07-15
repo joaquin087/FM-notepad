@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Player } from '../types';
 import { Upload, HelpCircle, CheckCircle, AlertCircle, Sparkles } from 'lucide-react';
+import { FM_ATTRIBUTES } from './PlayerProfileModal';
 
 interface ClipboardImporterProps {
   onImportPlayers: (newPlayers: Player[], mode: 'replace' | 'append') => void;
@@ -156,7 +157,7 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount, gameDa
         const cells = lines[i].split(delimiter).map(c => c.trim());
         if (cells.length < 2) continue; // Skip lines with insufficient columns
 
-        let id = "";
+         let id = "";
         let name = "";
         let age = 22;
         let position = "M (C)";
@@ -175,14 +176,50 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount, gameDa
         let clubId = "";
         let intCaps = 0;
         let intGoals = 0;
+        let bestPosition = "";
+        let secPosition = "";
+        const attributes: Record<string, number> = {};
 
         if (hasHeaders) {
           headers.forEach((header, colIndex) => {
             const val = cells[colIndex];
             if (val === undefined || val === null || val === "") return;
 
+            // Attribute mapping check
+            const cleanHeader = header.toLowerCase().trim();
+            const matchedAttr = FM_ATTRIBUTES.find(attr => 
+              attr.key.toLowerCase() === cleanHeader || 
+              attr.labelEs.toLowerCase() === cleanHeader || 
+              attr.labelEn.toLowerCase() === cleanHeader ||
+              cleanHeader === "gk eccentricity" && attr.key === "eccentricity" ||
+              cleanHeader === "eccentricity" && attr.key === "eccentricity" ||
+              cleanHeader === "excentricidad" && attr.key === "eccentricity" ||
+              cleanHeader === "determination" && attr.key === "determination" ||
+              cleanHeader === "determinación" && attr.key === "determination" ||
+              cleanHeader === "determinacion" && attr.key === "determination" ||
+              cleanHeader === "free kicks" && attr.key === "freeKicks" ||
+              cleanHeader === "lanzamiento de faltas" && attr.key === "freeKicks" ||
+              cleanHeader === "first touch" && attr.key === "firstTouch" ||
+              cleanHeader === "primer toque" && attr.key === "firstTouch" ||
+              cleanHeader === "one on ones" && attr.key === "oneOnOnes" ||
+              cleanHeader === "unos contra unos" && attr.key === "oneOnOnes" ||
+              cleanHeader === "rushing out" && attr.key === "rushingOut" ||
+              cleanHeader === "salidas" && attr.key === "rushingOut"
+            );
+
+            if (matchedAttr) {
+              const attrVal = parseInt(val, 10);
+              if (!isNaN(attrVal) && attrVal >= 1 && attrVal <= 20) {
+                attributes[matchedAttr.key] = attrVal;
+              }
+            }
+
             if (header === "club id" || header === "clubid") {
               clubId = val;
+            } else if (header.includes("best position") || header.includes("best pos") || header.includes("mejor pos") || header.includes("posición principal") || header.includes("posicion principal")) {
+              bestPosition = val;
+            } else if (header.includes("sec. position") || header.includes("sec position") || header.includes("sec. pos") || header.includes("sec pos") || header.includes("segunda pos") || header.includes("posición secundaria") || header.includes("posicion secundaria")) {
+              secPosition = val;
             } else if (header.includes("best pot rating") || header.includes("bestpotrating") || header.includes("mejor pot") || header.includes("calidad potencial %") || header === "best pot rating") {
               const res = parseImportedRating(val);
               bestPotRating = res.raw;
@@ -311,7 +348,10 @@ export function ClipboardImporter({ onImportPlayers, currentPlayersCount, gameDa
           dateOfBirth,
           clubId,
           intCaps,
-          intGoals
+          intGoals,
+          attributes: Object.keys(attributes).length > 0 ? attributes : undefined,
+          bestPosition: bestPosition || undefined,
+          secPosition: secPosition || undefined
         });
       }
 

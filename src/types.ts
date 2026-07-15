@@ -43,6 +43,11 @@ export interface Player {
   clubPrestamo?: string; // loan destination team
   finPrestamo?: string; // loan end year / date
   opcionCompra?: string; // purchase option value
+
+  // Detailed Attributes for suitability and profile analysis
+  attributes?: Record<string, number>;
+  bestPosition?: string;
+  secPosition?: string;
 }
 
 export interface Snapshot {

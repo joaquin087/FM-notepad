@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Player } from '../types';
 import { getFlagEmoji, isTurkishPlayer, calculateAgeFromDOB } from '../utils/flags';
+import { PlayerProfileModal } from './PlayerProfileModal';
 import { 
   Users, 
   Plus, 
@@ -110,6 +111,7 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, ga
   const [activeCell, setActiveCell] = useState<{ rowKey: string; colKey: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [profilePlayer, setProfilePlayer] = useState<Player | null>(null);
   const [filterUnassignedOnly, setFilterUnassignedOnly] = useState(true);
   
   // Drag and Drop States
@@ -771,6 +773,16 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, ga
               >
                 <UserMinus className="w-3.5 h-3.5" /> Quitar de la Matriz
               </button>
+
+              <button
+                onClick={() => {
+                  setProfilePlayer(selectedPlayer);
+                  setSelectedPlayer(null);
+                }}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition flex items-center gap-1 shadow-md shadow-emerald-950/40"
+              >
+                🔍 Ver Perfil y Atributos
+              </button>
               
               <button
                 onClick={() => setSelectedPlayer(null)}
@@ -782,6 +794,19 @@ export function PlanningGrid({ players, onUpdatePlayer, onUpdatePlayersBatch, ga
 
           </div>
         </div>
+      )}
+
+      {/* MODAL 3: INDIVIDUAL PLAYER PROFILE */}
+      {profilePlayer && (
+        <PlayerProfileModal
+          player={profilePlayer}
+          onClose={() => setProfilePlayer(null)}
+          onUpdatePlayer={(p) => {
+            onUpdatePlayer(p);
+            setProfilePlayer(p);
+          }}
+          gameYear={gameYear}
+        />
       )}
 
     </div>

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Player } from '../types';
 import { getFlagEmoji, isTurkishPlayer, formatRatingWithPercentage, getPlayerFlags, calculateAgeFromDOB, calculateContractYearsRemaining, calculateAgeFromDOBPrecise, calculateContractYearsRemainingPrecise } from '../utils/flags';
-import { Search, Filter, Plus, Trash2, Edit3, Check, X, Star, AlertCircle, RefreshCw, Trash, FileText, Calendar, UserMinus } from 'lucide-react';
+import { Search, Filter, Plus, Trash2, Edit3, Check, X, Star, AlertCircle, RefreshCw, Trash, FileText, Calendar, UserMinus, Eye, BarChart2 } from 'lucide-react';
+import { PlayerProfileModal } from './PlayerProfileModal';
+import { PlayerComparisonModal } from './PlayerComparisonModal';
 import { fifaNations } from '../utils/fifaNations';
 
 interface RosterManagerProps {
@@ -44,6 +46,15 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
   const [contractYearsFilter, setContractYearsFilter] = useState('ALL');
   const [minAgeFilter, setMinAgeFilter] = useState<string>('');
   const [maxAgeFilter, setMaxAgeFilter] = useState<string>('');
+
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+  const [isComparisonOpen, setIsComparisonOpen] = useState(false);
+
+  const [clubFilter, setClubFilter] = useState('ALL');
+  const [natFilter, setNatFilter] = useState('ALL');
+  const [ageFilter, setAgeFilter] = useState('ALL');
+  const [valueFilter, setValueFilter] = useState('ALL');
+  const [wageFilter, setWageFilter] = useState('ALL');
 
   // Separate first and last name for manual add player
   const [newFirstName, setNewFirstName] = useState('');
@@ -108,6 +119,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
   const [bajaComentario, setBajaComentario] = useState('');
 
   const [isAdding, setIsAdding] = useState(false);
+  const [profilePlayer, setProfilePlayer] = useState<Player | null>(null);
 
   // Sorting state
   const [sortField, setSortField] = useState<string | null>(null);
@@ -272,6 +284,66 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
 
   // Unique list of positions for filter
   const positionsList = ['ALL', 'GK', 'D (C)', 'D (L)', 'D (R)', 'DM', 'M (C)', 'AM (L)', 'AM (R)', 'AM (C)', 'ST (C)'];
+
+  const uniqueClubs = React.useMemo(() => {
+    const clubs = new Set<string>();
+    players.forEach(p => {
+      if (p.club) clubs.add(p.club);
+    });
+    return ['ALL', ...Array.from(clubs).sort()];
+  }, [players]);
+
+  const uniqueNationalities = React.useMemo(() => {
+    const nats = new Set<string>();
+    players.forEach(p => {
+      if (p.nationality) nats.add(p.nationality);
+    });
+    return ['ALL', ...Array.from(nats).sort()];
+  }, [players]);
+
+  const parseValueToNumber = (valStr: string | undefined): number => {
+    if (!valStr) return 0;
+    const clean = valStr.replace(/\s/g, '').toLowerCase();
+    if (clean.includes('-')) {
+      const parts = clean.split('-');
+      const p1 = parseSingleValue(parts[0]);
+      const p2 = parseSingleValue(parts[1]);
+      return (p1 + p2) / 2;
+    }
+    return parseSingleValue(clean);
+  };
+
+  const parseSingleValue = (s: string): number => {
+    const clean = s.replace(/[^0-9.]/g, '');
+    let num = parseFloat(clean);
+    if (isNaN(num)) return 0;
+    if (s.includes('k')) {
+      num *= 1000;
+    } else if (s.includes('m')) {
+      num *= 1000000;
+    }
+    return num;
+  };
+
+  const parseWageToNumber = (wageStr: string | undefined): number => {
+    if (!wageStr) return 0;
+    const clean = wageStr.replace(/\s/g, '').toLowerCase();
+    const isAnnual = clean.includes('p/a') || clean.includes('año') || clean.includes('anual');
+    const parsedNum = clean.replace(/[^0-9.]/g, '');
+    let num = parseFloat(parsedNum);
+    if (isNaN(num)) return 0;
+    
+    if (clean.includes('k')) {
+      num *= 1000;
+    } else if (clean.includes('m')) {
+      num *= 1000000;
+    }
+    
+    if (!isAnnual) {
+      num *= 52;
+    }
+    return num;
+  };
   const statusLabels: Record<string, string> = {
     'titular': '🟢 Titular',
     'suplente': '🟡 Suplente',
@@ -328,9 +400,35 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                             player.id.includes(searchTerm) ||
                             player.nationality.toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesPosition = positionFilter === 'ALL' || 
-                              player.position.toLowerCase() === positionFilter.toLowerCase() ||
-                              player.position.toLowerCase().includes(positionFilter.toLowerCase());
+      let matchesPosition = positionFilter === 'ALL';
+      if (!matchesPosition) {
+        const pFilter = positionFilter.toUpperCase();
+        const posLower = player.position.toLowerCase();
+        if (pFilter === 'GK') {
+          matchesPosition = posLower.includes('gk') || posLower.includes('por');
+        } else if (pFilter === 'DC') {
+          matchesPosition = posLower.includes('d (c)') || posLower.includes('dfc') || posLower.includes('def (c)');
+        } else if (pFilter === 'DL') {
+          matchesPosition = posLower.includes('d (l)') || posLower.includes('wbl') || posLower.includes('dfi') || posLower.includes('def (l)') || posLower.includes('wl');
+        } else if (pFilter === 'DR') {
+          matchesPosition = posLower.includes('d (r)') || posLower.includes('wbr') || posLower.includes('dfd') || posLower.includes('def (r)') || posLower.includes('wr');
+        } else if (pFilter === 'DM') {
+          matchesPosition = posLower.includes('dm') || posLower.includes('piv') || posLower.includes('cr (c)') || posLower.includes('cd');
+        } else if (pFilter === 'MC') {
+          matchesPosition = posLower.includes('m (c)') || posLower.includes('mc') || posLower.includes('cc');
+        } else if (pFilter === 'ML') {
+          matchesPosition = posLower.includes('m (l)') || posLower.includes('m (i)') || posLower.includes('ml') || posLower.includes('mi') || posLower.includes('aml');
+        } else if (pFilter === 'MR') {
+          matchesPosition = posLower.includes('m (r)') || posLower.includes('m (d)') || posLower.includes('mr') || posLower.includes('md') || posLower.includes('amr');
+        } else if (pFilter === 'AMC') {
+          matchesPosition = posLower.includes('am (c)') || posLower.includes('mpc') || posLower.includes('amc');
+        } else if (pFilter === 'ST') {
+          matchesPosition = posLower.includes('st (c)') || posLower.includes('dlc') || posLower.includes('del') || posLower.includes('st') || posLower.includes('st (');
+        } else {
+          matchesPosition = player.position.toLowerCase() === positionFilter.toLowerCase() ||
+                            player.position.toLowerCase().includes(positionFilter.toLowerCase());
+        }
+      }
                               
       const matchesStatus = ignoreStatusFilter || statusFilter === 'ALL' || player.squadStatus === statusFilter;
 
@@ -357,7 +455,61 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
       const matchesMinAge = minAgeFilter === '' || calculatedAge >= parseInt(minAgeFilter);
       const matchesMaxAge = maxAgeFilter === '' || calculatedAge <= parseInt(maxAgeFilter);
 
-      return matchesSearch && matchesPosition && matchesStatus && matchesContractYears && matchesMinAge && matchesMaxAge;
+      // Club Filter
+      const matchesClub = clubFilter === 'ALL' || (player.club && player.club === clubFilter);
+
+      // Nationality Filter
+      const matchesNat = natFilter === 'ALL' || (player.nationality && player.nationality === natFilter);
+
+      // Age Group Filter
+      let matchesAgeGroup = true;
+      if (ageFilter !== 'ALL') {
+        if (ageFilter === '<20') {
+          matchesAgeGroup = calculatedAge < 20;
+        } else if (ageFilter === '20-25') {
+          matchesAgeGroup = calculatedAge >= 20 && calculatedAge <= 25;
+        } else if (ageFilter === '26-30') {
+          matchesAgeGroup = calculatedAge >= 26 && calculatedAge <= 30;
+        } else if (ageFilter === '31+') {
+          matchesAgeGroup = calculatedAge >= 31;
+        }
+      }
+
+      // Value Group Filter
+      let matchesValueGroup = true;
+      if (valueFilter !== 'ALL') {
+        const valNum = parseValueToNumber(player.marketValue);
+        if (valueFilter === '<1M') {
+          matchesValueGroup = valNum < 1000000;
+        } else if (valueFilter === '1M-5M') {
+          matchesValueGroup = valNum >= 1000000 && valNum <= 5000000;
+        } else if (valueFilter === '5M-15M') {
+          matchesValueGroup = valNum >= 5000000 && valNum <= 15000000;
+        } else if (valueFilter === '15M-30M') {
+          matchesValueGroup = valNum >= 15000000 && valNum <= 30000000;
+        } else if (valueFilter === '30M+') {
+          matchesValueGroup = valNum > 30000000;
+        }
+      }
+
+      // Wage Group Filter
+      let matchesWageGroup = true;
+      if (wageFilter !== 'ALL') {
+        const wageNum = parseWageToNumber(player.wage);
+        if (wageFilter === '<100K') {
+          matchesWageGroup = wageNum < 100000;
+        } else if (wageFilter === '100K-500K') {
+          matchesWageGroup = wageNum >= 100000 && wageNum <= 500000;
+        } else if (wageFilter === '500K-1M') {
+          matchesWageGroup = wageNum >= 500000 && wageNum <= 1000000;
+        } else if (wageFilter === '1M-5M') {
+          matchesWageGroup = wageNum >= 1000000 && wageNum <= 5000000;
+        } else if (wageFilter === '5M+') {
+          matchesWageGroup = wageNum > 5000000;
+        }
+      }
+
+      return matchesSearch && matchesPosition && matchesStatus && matchesContractYears && matchesMinAge && matchesMaxAge && matchesClub && matchesNat && matchesAgeGroup && matchesValueGroup && matchesWageGroup;
     });
   };
 
@@ -1116,6 +1268,120 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
     );
   };
 
+  const renderSortHeaderWithFilter = (
+    field: string,
+    label: string,
+    extraClass: string = '',
+    filterNode?: React.ReactNode
+  ) => {
+    const isSorted = sortField === field;
+    return (
+      <th 
+        onClick={() => handleSort(field)}
+        className={`px-3 py-2 font-semibold text-slate-400 hover:text-white cursor-pointer select-none transition group/hdr ${extraClass}`}
+      >
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1.5">
+            <span>{label}</span>
+            <span className="text-[8px] text-slate-600 group-hover/hdr:text-slate-300 shrink-0">
+              {isSorted ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+            </span>
+          </div>
+          {filterNode && (
+            <div onClick={(e) => e.stopPropagation()} className="mt-0.5">
+              {filterNode}
+            </div>
+          )}
+        </div>
+      </th>
+    );
+  };
+
+  const natFilterSelect = (
+    <select
+      value={natFilter}
+      onChange={(e) => setNatFilter(e.target.value)}
+      className="bg-slate-950/80 hover:bg-slate-900 border border-slate-800 rounded px-1 py-0.5 text-[9px] text-slate-300 font-sans cursor-pointer focus:outline-none w-full max-w-[70px]"
+    >
+      <option value="ALL">▽ Nac</option>
+      {uniqueNationalities.filter(n => n !== 'ALL').map(n => (
+        <option key={n} value={n} className="bg-slate-900">{n}</option>
+      ))}
+    </select>
+  );
+
+  const positionFilterSelect = (
+    <select
+      value={positionFilter}
+      onChange={(e) => setPositionFilter(e.target.value)}
+      className="bg-slate-950/80 hover:bg-slate-900 border border-slate-800 rounded px-1 py-0.5 text-[9px] text-slate-300 font-sans cursor-pointer focus:outline-none w-full max-w-[70px]"
+    >
+      <option value="ALL">▽ Pos</option>
+      {['GK', 'DC', 'DL', 'DR', 'DM', 'MC', 'ML', 'MR', 'AMC', 'ST'].map(pos => (
+        <option key={pos} value={pos} className="bg-slate-900">{pos}</option>
+      ))}
+    </select>
+  );
+
+  const ageFilterSelect = (
+    <select
+      value={ageFilter}
+      onChange={(e) => setAgeFilter(e.target.value)}
+      className="bg-slate-950/80 hover:bg-slate-900 border border-slate-800 rounded px-1 py-0.5 text-[9px] text-slate-300 font-sans cursor-pointer focus:outline-none w-full max-w-[80px]"
+    >
+      <option value="ALL">▽ Edad</option>
+      <option value="<20" className="bg-slate-900">&lt; 20</option>
+      <option value="20-25" className="bg-slate-900">20-25</option>
+      <option value="26-30" className="bg-slate-900">26-30</option>
+      <option value="31+" className="bg-slate-900">31+</option>
+    </select>
+  );
+
+  const valueFilterSelect = (
+    <select
+      value={valueFilter}
+      onChange={(e) => setValueFilter(e.target.value)}
+      className="bg-slate-950/80 hover:bg-slate-900 border border-slate-800 rounded px-1 py-0.5 text-[9px] text-slate-300 font-sans cursor-pointer focus:outline-none w-full max-w-[85px]"
+    >
+      <option value="ALL">▽ Valor</option>
+      <option value="<1M" className="bg-slate-900">&lt; €1M</option>
+      <option value="1M-5M" className="bg-slate-900">€1M-€5M</option>
+      <option value="5M-15M" className="bg-slate-900">€5M-€15M</option>
+      <option value="15M-30M" className="bg-slate-900">€15M-€30M</option>
+      <option value="30M+" className="bg-slate-900">&gt; €30M</option>
+    </select>
+  );
+
+  const wageFilterSelect = (
+    <select
+      value={wageFilter}
+      onChange={(e) => setWageFilter(e.target.value)}
+      className="bg-slate-950/80 hover:bg-slate-900 border border-slate-800 rounded px-1 py-0.5 text-[9px] text-slate-300 font-sans cursor-pointer focus:outline-none w-full max-w-[95px]"
+    >
+      <option value="ALL">▽ Sueldo</option>
+      <option value="<100K" className="bg-slate-900">&lt; €100K p/a</option>
+      <option value="100K-500K" className="bg-slate-900">€100K-€500K</option>
+      <option value="500K-1M" className="bg-slate-900">€500K-€1M</option>
+      <option value="1M-5M" className="bg-slate-900">€1M-€5M</option>
+      <option value="5M+" className="bg-slate-900">&gt; €5M p/a</option>
+    </select>
+  );
+
+  const statusFilterSelect = (
+    <select
+      value={statusFilter}
+      onChange={(e) => setStatusFilter(e.target.value)}
+      className="bg-slate-950/80 hover:bg-slate-900 border border-slate-800 rounded px-1 py-0.5 text-[9px] text-slate-300 font-sans cursor-pointer focus:outline-none w-full max-w-[95px]"
+    >
+      <option value="ALL">▽ Estado</option>
+      {Object.entries(statusLabels)
+        .filter(([key]) => key !== 'baja' && key !== 'cedidos' && key !== 'desarrollo')
+        .map(([key, label]) => (
+          <option key={key} value={key} className="bg-slate-900">{label.replace(/^[^\s]+\s/, '')}</option>
+        ))}
+    </select>
+  );
+
   const handleSort = (field: string) => {
     if (sortField === field) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -1162,6 +1428,18 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
             className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 font-semibold transition"
           >
             <Plus className="w-3.5 h-3.5" /> Nuevo Jugador
+          </button>
+
+          <button
+            onClick={() => setIsComparisonOpen(true)}
+            disabled={selectedPlayerIds.length < 2}
+            className={`text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 font-semibold transition ${
+              selectedPlayerIds.length >= 2
+                ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 cursor-pointer shadow-md'
+                : 'bg-slate-900 text-slate-600 border border-slate-800 cursor-not-allowed'
+            }`}
+          >
+            <BarChart2 className="w-3.5 h-3.5" /> Comparar ({selectedPlayerIds.length})
           </button>
 
           {confirmDeleteAll ? (
@@ -1228,10 +1506,32 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
         </div>
       </div>
 
+      {/* Position Strip Filter */}
+      <div className="flex flex-wrap gap-1.5 pb-2 border-b border-slate-800/40">
+        {['ALL', 'GK', 'DC', 'DL', 'DR', 'DM', 'MC', 'ML', 'MR', 'AMC', 'ST'].map(pos => {
+          const isActive = positionFilter === pos;
+          return (
+            <button
+              key={pos}
+              onClick={() => {
+                setPositionFilter(pos);
+              }}
+              className={`px-3 py-1 text-xs font-bold rounded-lg transition-all duration-150 font-sans ${
+                isActive
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              }`}
+            >
+              {pos}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Filter and Search Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900/20 p-2.5 rounded-xl border border-slate-800/40">
         {/* Search */}
-        <div className="relative">
+        <div className="relative w-full sm:max-w-md">
           <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-500" />
           <input
             type="text"
@@ -1242,81 +1542,10 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
           />
         </div>
 
-        {/* Position Filter */}
-        <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg px-2">
-          <span className="text-[10px] uppercase font-bold text-slate-500 font-sans">Pos:</span>
-          <select
-            value={positionFilter}
-            onChange={(e) => setPositionFilter(e.target.value)}
-            className="w-full bg-transparent border-0 text-xs py-1.5 text-slate-200 focus:outline-none focus:ring-0 cursor-pointer font-sans"
-          >
-            {positionsList.map(pos => (
-              <option key={pos} value={pos} className="bg-slate-900">{pos === 'ALL' ? 'Todas' : pos}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Status Filter */}
-        <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg px-2">
-          <span className="text-[10px] uppercase font-bold text-slate-500 font-sans">Estado:</span>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full bg-transparent border-0 text-xs py-1.5 text-slate-200 focus:outline-none focus:ring-0 cursor-pointer font-sans"
-          >
-            <option value="ALL" className="bg-slate-900">Todos</option>
-            {Object.entries(statusLabels)
-              .filter(([key]) => key !== 'baja' && key !== 'cedidos' && key !== 'desarrollo')
-              .map(([key, val]) => (
-                <option key={key} value={key} className="bg-slate-900">{val}</option>
-              ))}
-          </select>
-        </div>
-
-        {/* Years of contract filter */}
-        <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg px-2">
-          <span className="text-[10px] uppercase font-bold text-slate-500 font-sans whitespace-nowrap">Contrato:</span>
-          <select
-            value={contractYearsFilter}
-            onChange={(e) => setContractYearsFilter(e.target.value)}
-            className="w-full bg-transparent border-0 text-xs py-1.5 text-slate-200 focus:outline-none focus:ring-0 cursor-pointer font-sans"
-          >
-            <option value="ALL" className="bg-slate-900">Todos</option>
-            <option value="1_or_less" className="bg-slate-900">1 año o menos</option>
-            <option value="2" className="bg-slate-900">2 años</option>
-            <option value="3" className="bg-slate-900">3 años</option>
-            <option value="4_or_more" className="bg-slate-900 font-sans">4 o más años</option>
-          </select>
-        </div>
-
-        {/* Min Age Filter */}
-        <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg px-2">
-          <span className="text-[10px] uppercase font-bold text-slate-500 font-sans whitespace-nowrap">Edad Mín:</span>
-          <select
-            value={minAgeFilter}
-            onChange={(e) => setMinAgeFilter(e.target.value)}
-            className="w-full bg-transparent border-0 text-xs py-1.5 text-slate-200 focus:outline-none focus:ring-0 cursor-pointer font-sans"
-          >
-            <option value="" className="bg-slate-900">Todos</option>
-            {Array.from({ length: 32 }, (_, i) => i + 14).map(age => (
-              <option key={age} value={age.toString()} className="bg-slate-900">{age} años</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Max Age Filter */}
-        <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg px-2">
-          <span className="text-[10px] uppercase font-bold text-slate-500 font-sans whitespace-nowrap">Edad Máx:</span>
-          <select
-            value={maxAgeFilter}
-            onChange={(e) => setMaxAgeFilter(e.target.value)}
-            className="w-full bg-transparent border-0 text-xs py-1.5 text-slate-200 focus:outline-none focus:ring-0 cursor-pointer font-sans"
-          >
-            <option value="" className="bg-slate-900">Todos</option>
-            {Array.from({ length: 32 }, (_, i) => i + 14).map(age => (
-              <option key={age} value={age.toString()} className="bg-slate-900">{age} años</option>
-            ))}
-          </select>
+        {/* Player Count Indicator */}
+        <div className="flex items-center gap-1.5 shrink-0 text-xs font-sans font-medium text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800/50">
+          <span className="text-emerald-400 font-bold">{sortedPlayers.length}</span>
+          <span>jugadores scoutados</span>
         </div>
       </div>
 
@@ -2585,16 +2814,32 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
         <table className="min-w-full divide-y divide-slate-800 text-left text-xs font-sans">
           <thead className="bg-slate-900/80 text-slate-400 uppercase tracking-wider font-sans font-semibold text-[10px] whitespace-nowrap">
             <tr>
-              {renderSortHeader('name', 'Nombre', 'w-[180px]')}
-              {renderSortHeader('nationality', 'Nac', 'w-[50px]')}
-              {renderSortHeader('position', 'Pos', 'w-[70px]')}
-              {renderSortHeader('age', 'Edad (DOB)', 'w-[110px]')}
-              {renderSortHeader('wage', 'Sueldo Anual', 'w-[105px]')}
-              {renderSortHeader('marketValue', 'VALOR', 'w-[80px]')}
+              <th className="px-3 py-3 w-[40px] text-center select-none">
+                <input
+                  type="checkbox"
+                  checked={sortedPlayers.length > 0 && sortedPlayers.every(p => selectedPlayerIds.includes(p.id))}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      const toAdd = sortedPlayers.map(p => p.id);
+                      setSelectedPlayerIds(prev => Array.from(new Set([...prev, ...toAdd])));
+                    } else {
+                      const toRemove = new Set(sortedPlayers.map(p => p.id));
+                      setSelectedPlayerIds(prev => prev.filter(id => !toRemove.has(id)));
+                    }
+                  }}
+                  className="rounded bg-slate-950 border-slate-800 text-emerald-500 focus:ring-emerald-500/20 w-3.5 h-3.5 cursor-pointer"
+                />
+              </th>
+              {renderSortHeaderWithFilter('name', 'Nombre', 'w-[180px]')}
+              {renderSortHeaderWithFilter('nationality', 'Nac', 'w-[85px]', natFilterSelect)}
+              {renderSortHeaderWithFilter('position', 'Pos', 'w-[85px]', positionFilterSelect)}
+              {renderSortHeaderWithFilter('age', 'Edad (DOB)', 'w-[110px]', ageFilterSelect)}
+              {renderSortHeaderWithFilter('wage', 'Sueldo Anual', 'w-[120px]', wageFilterSelect)}
+              {renderSortHeaderWithFilter('marketValue', 'VALOR', 'w-[110px]', valueFilterSelect)}
               {renderSortHeader('ca', 'Calidad (CA)', 'w-[110px]')}
               {renderSortHeader('pa', 'Potencial (PA)', 'w-[110px]')}
               {renderSortHeader('contractEnd', 'Fin Contrato', 'w-[130px]')}
-              {renderSortHeader('squadStatus', 'Estado', 'w-[110px]')}
+              {renderSortHeaderWithFilter('squadStatus', 'Estado', 'w-[125px]', statusFilterSelect)}
               <th className="px-3 py-3 font-semibold text-slate-400 text-right w-[110px]">Acciones</th>
               {renderSortHeader('id', 'ID Único', 'w-[75px] text-right')}
             </tr>
@@ -2602,7 +2847,7 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
           <tbody className="divide-y divide-slate-800/60">
             {sortedPlayers.length === 0 ? (
               <tr>
-                <td colSpan={12} className="px-4 py-8 text-center text-slate-500 italic">
+                <td colSpan={13} className="px-4 py-8 text-center text-slate-500 italic">
                   Ningún jugador coincide con los filtros de búsqueda.
                 </td>
               </tr>
@@ -2622,10 +2867,25 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                         : ''
                     }`}
                   >
+                    <td className="px-3 py-2 text-center w-[40px]">
+                      <input
+                        type="checkbox"
+                        checked={selectedPlayerIds.includes(player.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedPlayerIds(prev => [...prev, player.id]);
+                          } else {
+                            setSelectedPlayerIds(prev => prev.filter(id => id !== player.id));
+                          }
+                        }}
+                        className="rounded bg-slate-950 border-slate-800 text-emerald-500 focus:ring-emerald-500/20 w-3.5 h-3.5 cursor-pointer"
+                      />
+                    </td>
                     <td className="px-3 py-2 font-medium text-slate-100 w-[180px] max-w-[180px]" title={player.name}>
                       <div className="flex items-center gap-1.5 overflow-hidden">
                         <span 
-                          className="truncate"
+                          onClick={() => setProfilePlayer(player)}
+                          className="truncate cursor-pointer hover:underline text-slate-100 hover:text-slate-200 font-semibold transition-colors"
                           style={{ fontSize: player.name.length > 20 ? '10.8px' : '12px' }}
                         >
                           {player.name}
@@ -2725,6 +2985,16 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
 
                             <button
                               onClick={() => {
+                                setProfilePlayer(player);
+                              }}
+                              className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 border border-slate-750 transition"
+                              title="Ver Perfil y Atributos"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => {
                                 handleEditClick(player);
                               }}
                               className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
@@ -2818,7 +3088,13 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
                     <td className="px-3 py-2 text-slate-500 font-sans font-medium text-[10px]">{p.id}</td>
                     <td className="px-3 py-2">
                       <div className="font-bold text-slate-100 flex items-center gap-1.5 overflow-hidden">
-                        <span style={{ fontSize: p.name.length > 20 ? '10.8px' : '12px' }}>{p.name}</span>
+                        <span 
+                          onClick={() => setProfilePlayer(p)}
+                          className="cursor-pointer hover:underline text-slate-100 hover:text-slate-200 transition-colors font-semibold"
+                          style={{ fontSize: p.name.length > 20 ? '10.8px' : '12px' }}
+                        >
+                          {p.name}
+                        </span>
                         {p.canterano && <CanteranoBadge />}
                       </div>
                       <div className="text-[10px] text-slate-500 font-sans">{p.position} • {p.age} años</div>
@@ -3238,6 +3514,26 @@ export function RosterManager({ players, onUpdatePlayer, onAddPlayer, onDeletePl
           </div>
         )}
       </div>
+
+      {/* DETAILED PLAYER PROFILE MODAL */}
+      {profilePlayer && (
+        <PlayerProfileModal
+          player={profilePlayer}
+          onClose={() => setProfilePlayer(null)}
+          onUpdatePlayer={(p) => {
+            onUpdatePlayer(p);
+            setProfilePlayer(p);
+          }}
+          gameYear={gameYear}
+        />
+      )}
+
+      {/* PLAYER COMPARISON MODAL */}
+      <PlayerComparisonModal
+        isOpen={isComparisonOpen}
+        onClose={() => setIsComparisonOpen(false)}
+        players={players.filter(p => selectedPlayerIds.includes(p.id))}
+      />
     </div>
   );
 }
